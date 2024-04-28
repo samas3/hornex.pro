@@ -5,14 +5,17 @@ const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
     this.version = '1.6';
-    this.config = {
+    this.config = {};
+    this.default = {
       damageDisplay: true, // 是否启用伤害显示修改
       DDenableNumber: true, // 是否显示伤害数值而不是百分比（若可用）
       healthDisplay: true, // 是否启用血量显示
-      disableChatCheck: true // 是否禁用聊天内容检查
+      disableChatCheck: true, // 是否禁用聊天内容检查
+      autoRespawn: true // 是否启用自动重生
     };
-    this.configKeys = Object.keys(this.config);
+    this.configKeys = Object.keys(this.default);
     this.chatFunc = null;
+    this.toastFunc = null;
     this.moblst = null;
     this.rarityColor = [
       '#7eef6d',
@@ -69,12 +72,14 @@ class HornexHack{
         this.status.style.backgroundClip = 'text';
       }, 100);
   }
-  setStatus(){
+  setStatus(content){
     this.status.innerHTML = content;
   }
   onload(){
+    this.load();
     this.addChat(`${this.name} enabled!`);
     this.addChat('Type /help in chat box to get help');
+    this.registerDie();
   }
   toggle(module){
     if(this.hasModule(module)){
@@ -88,7 +93,7 @@ class HornexHack{
   list(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
-      this.addChat(`${item}: ${this.config[item]}`, '#ffffff');
+      this.addChat(`${item}: ${this.config[item]} (defaults to ${this.default[item]})`, '#ffffff');
     }
   }
   save(){
@@ -101,6 +106,9 @@ class HornexHack{
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
       this.config[item] = localStorage.getItem(`hh${item}`);
+      if(!localStorage.getItem(`hh${item}`)){
+        this.config[item] = this.default[item];
+      }
     }
   }
   getHelp(){
@@ -142,8 +150,31 @@ class HornexHack{
     if(args.length != 2){
       this.addChat('Args num not correct', '#ff7f50');
     }else{
-      func(args[1]);
+      this[func](args[1]);
     }
+  }
+  registerDie(){
+    this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
+    var div = $_('body > div.score-overlay');
+    var that = this;
+    var observer = new this.MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type == 'attributes') {
+              var style = mutation.target.style;
+              console.log(style);
+              if(style.display != 'none' && that.isEnabled('autoRespawn')){
+                that.respawn();
+              }
+            }
+        });
+    });
+    observer.observe(div, {
+        attributes: true,
+        attributeFilter: ['style']
+    });
+  }
+  respawn(){
+    $_('body > div.score-overlay > div.score-area > div.btn.continue-btn').onclick();
   }
 }
 var hack = new HornexHack();
@@ -152,7 +183,7 @@ function getHP(mob, lst) {
   var tier = mob['tier'],
     type = mob['type'];
   if(mob['typeStr'].includes('centipedeBody')) type--;
-  if (!(tier && tier < lst.length)) return;
+  if (!lst[tier] || tier >= lst.length) return;
   for (var i = 0; i < lst[tier].length; i++) {
     var j = lst[tier][i];
     if (type == j['type']) return j['health']; // hack identifier
@@ -10402,9 +10433,9 @@ function a() {
     function kG(rn = ![]) {
       const wC = uf;
       hack.chatFunc = hK;
+      hack.toastFunc = hc;
       hack.onload();
       hack.moblst = eO;
-      console.log(eO);
       if (kk[wC(0xdd7)][wC(0xd71)] === wC(0x18e)) {
         kC[wC(0x3d4)][wC(0x86e)](wC(0x230));
         return;
@@ -16378,7 +16409,7 @@ function a() {
                       
                       var inputChat = rv;
                       if(inputChat.startsWith('/toggle')){
-                        hack.command2Arg(hack.toggle, inputChat);
+                        hack.command2Arg('toggle', inputChat);
                       }else if(inputChat.startsWith('/list')){
                         hack.addChat('List of module and configs:');
                         hack.list();
