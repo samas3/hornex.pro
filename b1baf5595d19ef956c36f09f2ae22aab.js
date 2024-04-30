@@ -161,7 +161,6 @@ class HornexHack{
         mutations.forEach(function(mutation) {
             if (mutation.type == 'attributes') {
               var style = mutation.target.style;
-              console.log(style);
               if(style.display != 'none' && that.isEnabled('autoRespawn')){
                 that.respawn();
               }
