@@ -4,14 +4,15 @@ const $$ = (i) => document.getElementsByClassName(i);
 const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
-    this.version = '1.6';
+    this.version = '1.7';
     this.config = {};
     this.default = {
       damageDisplay: true, // 是否启用伤害显示修改
       DDenableNumber: true, // 是否显示伤害数值而不是百分比（若可用）
       healthDisplay: true, // 是否启用血量显示
       disableChatCheck: true, // 是否禁用聊天内容检查
-      autoRespawn: true // 是否启用自动重生
+      autoRespawn: true, // 是否启用自动重生
+      colorText: false, // 是否启用公告彩字
     };
     this.configKeys = Object.keys(this.default);
     this.chatFunc = null;
@@ -30,30 +31,31 @@ class HornexHack{
     ];
     this.status = document.createElement('span');
     this.name = `Hornex.PRO Hack v${this.version} by samas3`;
+    this.commands = {
+      '/profile': '<internal> shows user\'s profile',
+      '/dlMob': '<internal> downloads an image of a specific mob',
+      '/dlPetal': '<internal> downloads an image of a specific petal',
+      '/toggle': 'toggles a specific module',
+      '/list': 'lists all the modules and configs',
+      '/help': 'show this help',
+      '/server': 'get current server',
+      '/wave': 'get wave progress',
+    };
   }
+  // ----- Notice -----
   addChat(text, color='#ff00ff'){
     this.chatFunc(text, color);
   }
-  hasModule(module){
-    return this.configKeys.includes(module);
-  }
-  isEnabled(module){
-    return this.hasModule(module) && this.config[module];
-  }
-  setEnabled(module, status){
-    if(this.hasModule(module)){
-      this.config[module] = status;
-    }else{
-      this.addChat(`Module or config not found: ${module}`, '#ff7f50');
-    }
+  addError(text){
+    this.addChat(text, '#ff7f50');
   }
   moveElement(arr) {
-    return arr.slice(-1).concat(arr.slice(0,-1))
+    return arr.slice(-1).concat(arr.slice(0, -1))
   }
   loadStatus(){
       var div = document.createElement('div');
       div.style.position = 'fixed';
-      div.style.bottom = '40px';
+      div.style.bottom = '60px';
       div.style.right = '0';
       div.style.padding = '10px';
       div.style.zIndex = '10000';
@@ -64,22 +66,33 @@ class HornexHack{
       this.status.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
       this.status.style.backgroundClip = 'text';
       this.status.style.webkitTextFillColor = 'transparent';
+      div.style.textAlign = 'right';
       this.status.innerHTML = this.name;
       div.appendChild(this.status);
       setInterval(() => {
-        colors = this.moveElement(colors);
-        this.status.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
-        this.status.style.backgroundClip = 'text';
+        if(this.isEnabled('colorText')){
+          colors = this.moveElement(colors);
+          this.status.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
+          this.status.style.backgroundClip = 'text';
+        }
       }, 100);
   }
   setStatus(content){
-    this.status.innerHTML = content;
+    this.status.innerHTML = this.name + '<br>' + content;
   }
-  onload(){
-    this.load();
-    this.addChat(`${this.name} enabled!`);
-    this.addChat('Type /help in chat box to get help');
-    this.registerDie();
+  // ----- Module -----
+  hasModule(module){
+    return this.configKeys.includes(module);
+  }
+  isEnabled(module){
+    return this.hasModule(module) && this.config[module];
+  }
+  setEnabled(module, status){
+    if(this.hasModule(module)){
+      this.config[module] = (status == "true");
+    }else{
+      this.addChat(`Module or config not found: ${module}`, '#ff7f50');
+    }
   }
   toggle(module){
     if(this.hasModule(module)){
@@ -93,34 +106,45 @@ class HornexHack{
   list(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
-      this.addChat(`${item}: ${this.config[item]} (defaults to ${this.default[item]})`, '#ffffff');
+      this.addChat(`${item}: ${this.isEnabled(item)} (defaults to ${this.default[item]})`, '#ffffff');
     }
   }
   save(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
-      localStorage.setItem(`hh${item}`, this.config[item]);
+      localStorage.setItem(`hh${item}`, this.isEnabled(item));
     }
   }
   load(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
-      this.config[item] = localStorage.getItem(`hh${item}`);
+      this.setEnabled(item, localStorage.getItem(`hh${item}`));
       if(!localStorage.getItem(`hh${item}`)){
         this.config[item] = this.default[item];
+        this.setEnabled(item, this.default[item]);
       }
     }
   }
+  // ----- Command -----
+  onload(){
+    this.load();
+    this.addChat(`${this.name} enabled!`);
+    this.addChat('Type /help in chat box to get help');
+    this.register();
+  }
+  notCommand(cmd){
+    return cmd[0] == '/' && !Object.keys(this.commands).includes(cmd);
+  }
   getHelp(){
     this.addChat('List of commands:');
-    this.addChat('/toggle <module> : toggles the specific module', '#ffffff');
-    this.addChat('/list : lists all the modules and configs', '#ffffff');
-    this.addChat('/help : show this help', '#ffffff');
-    this.addChat('/server : get current server', '#ffffff');
-    this.addChat('/wave : get current zone wave', '#ffffff');
+    var lst = Object.keys(this.commands);
+    for(var i = 0; i < lst.length; i++){
+      this.addChat(`${lst[i]} : ${this.commands[lst[i]]}`, '#ffffff');
+    }
   }
   getServer(){
-    this.addChat(`Current server: ${server.substring(0, 2).toUpperCase()}${server[server.length - 1]}`);
+    var server = localStorage.getItem('server');
+    return `${server.substring(0, 2).toUpperCase()}${server[server.length - 1]}`;
   }
   getColor(r){
     return this.rarityColor[r['tier']];
@@ -135,26 +159,27 @@ class HornexHack{
       case 'Ultra':
       case 'Super':
       case 'Hyper':
-        if(status.includes('Wave ')){
-          this.addChat(`${name} Wave: ${status}`);
+        if(!status.includes('Kills Needed')){
+          return `${name} Wave: ${status}`;
         }else{
-          this.addChat(`${name} Wave: ${Math.round((100 + parseFloat(prog)) * 100) / 100}%`);
+          return `${name} Wave: ${Math.round((100 + parseFloat(prog)) * 100) / 100}%`;
         }
-        break;
       default:
-        this.addChat('Not in Ultra/Super/Hyper zone')
+        return 'Not in Ultra/Super/Hyper zone';
     }
   }
   command2Arg(func, args){
     args = args.split(' ');
     if(args.length != 2){
-      this.addChat('Args num not correct', '#ff7f50');
+      this.addError('Args num not correct');
+      return true;
     }else{
       this[func](args[1]);
+      return false;
     }
   }
+  // ----- Event -----
   registerDie(){
-    this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
     var div = $_('body > div.score-overlay');
     var that = this;
     var observer = new this.MutationObserver(function(mutations) {
@@ -174,6 +199,18 @@ class HornexHack{
   }
   respawn(){
     $_('body > div.score-overlay > div.score-area > div.btn.continue-btn').onclick();
+  }
+  registerWave(){
+    setInterval(() => {
+      var status = this.getWave();
+      var server = this.getServer();
+      this.setStatus(`${server}: ${status}`);
+    }, 1000);
+  }
+  register(){
+    this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
+    this.registerDie();
+    this.registerWave();
   }
 }
 var hack = new HornexHack();
@@ -16415,9 +16452,11 @@ function a() {
                       }else if(inputChat.startsWith('/help')){
                         hack.getHelp();
                       }else if(inputChat.startsWith('/server')){
-                        hack.getServer();
+                        hack.addChat('Current server: ' + hack.getServer());
                       }else if(inputChat.startsWith('/wave')){
-                        hack.getWave();
+                        hack.addChat(hack.getWave());
+                      }else if(hack.notCommand(inputChat.split(' ')[0])){
+                        hack.addError('Invalid command!');
                       }else if (rv[zs(0x904)](zs(0xd0a))) {
                         const rA = rv[zs(0x471)](0x9);
                         nf(rA);
