@@ -11,7 +11,6 @@ function getInfoIndex(getInfo, string) {
 //hack主类
 
 const $ = (i) => document.getElementById(i);
-const $$ = (i) => document.getElementsByClassName(i);
 const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
@@ -218,10 +217,43 @@ class HornexHack{
       this.setStatus(`${server}: ${status}`);
     }, 1000);
   }
+  registerChat(){
+    var div = $_('body > div.common > div.chat > div');
+    var that = this;
+    var observer = new this.MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if(mutation.type == 'childList'){
+            var chat = mutation.addedNodes[0];
+            if(chat){
+              var childs = chat.childNodes;
+              var name = "", content = "";
+              for(var i = 0; i < childs.length; i++){
+                if(childs[i].className == 'chat-name') name = childs[i].getAttribute('stroke');
+                if(childs[i].className == 'chat-text'){
+                  if(childs[i].hasAttribute('stroke')){
+                    content = childs[i].getAttribute('stroke');
+                  }else{
+                    var c = childs[i].childNodes;
+                    for(var i = 0; i < c.length - 1; i += 2){
+                      name += c[i].getAttribute('stroke') + ' ';
+                    }
+                  }
+                }
+              }
+              console.log(name + ' ' + content);
+            }
+          }
+        });
+    });
+    observer.observe(div, {
+      childList: true
+    });
+  }
   register(){
     this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
     this.registerDie();
     this.registerWave();
+    this.registerChat();
   }
 }
 var hack = new HornexHack();
