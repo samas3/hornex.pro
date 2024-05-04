@@ -192,7 +192,7 @@ class HornexHack{
   registerDie(){
     var div = $_('body > div.score-overlay');
     var that = this;
-    var observer = new this.MutationObserver(function(mutations) {
+    this.dieObserver = new this.MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             if (mutation.type == 'attributes') {
               var style = mutation.target.style;
@@ -202,7 +202,7 @@ class HornexHack{
             }
         });
     });
-    observer.observe(div, {
+    this.dieObserver.observe(div, {
         attributes: true,
         attributeFilter: ['style']
     });
@@ -219,8 +219,7 @@ class HornexHack{
   }
   registerChat(){
     var div = $_('body > div.common > div.chat > div');
-    var that = this;
-    var observer = new this.MutationObserver(function(mutations) {
+    this.chatObserver = new this.MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
           if(mutation.type == 'childList'){
             var chat = mutation.addedNodes[0];
@@ -245,15 +244,15 @@ class HornexHack{
           }
         });
     });
-    observer.observe(div, {
+    this.chatObserver.observe(div, {
       childList: true
     });
   }
   register(){
     this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
-    this.registerDie();
     this.registerWave();
-    this.registerChat();
+    if(!this.chatObserver) this.registerChat();
+    if(!this.dieObserver) this.registerDie();
   }
 }
 var hack = new HornexHack();
