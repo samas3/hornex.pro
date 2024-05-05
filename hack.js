@@ -9,12 +9,11 @@ function getInfoIndex(getInfo, string) {
 }
 
 //hack主类
-
 const $ = (i) => document.getElementById(i);
 const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
-    this.version = '1.7';
+    this.version = '1.8';
     this.config = {};
     this.default = {
       damageDisplay: true, // 是否启用伤害显示修改
@@ -169,6 +168,7 @@ class HornexHack{
       case 'Ultra':
       case 'Super':
       case 'Hyper':
+      case 'Waveroom':
         if(!status.includes('Kills Needed')){
           return `${name} Wave: ${status}`;
         }else{
@@ -208,7 +208,10 @@ class HornexHack{
     });
   }
   respawn(){
-    $_('body > div.score-overlay > div.score-area > div.btn.continue-btn').onclick();
+    var quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
+    if(!quitBtn.classList.contains('red')){
+      quitBtn.onclick();
+    }
   }
   registerWave(){
     setInterval(() => {
@@ -260,7 +263,7 @@ hack.loadStatus();
 function getHP(mob, lst) {
   var tier = mob['tier'],
     type = mob['type'];
-  if(mob['typeStr'].includes('centipedeBody')) type--;
+  if(mob.isCentiBody) type--;
   if (!lst[tier] || tier >= lst.length) return;
   for (var i = 0; i < lst[tier].length; i++) {
     var j = lst[tier][i];
@@ -321,6 +324,10 @@ if(hack.isEnabled('healthDisplay')) 方法的第二个参数.drawImage(
   health2.worldW,
   health2.worldH
 );
+//在'Lvl '对应调用的方法参数前插入
+var hp = Math.round(方法的第一个参数.health * 100);
+var shield = Math.round(方法的第一个参数.shield * 100);
+`HP ${hp}% Shield ${shield}% ` + 第二个参数后面内容
 
 //聊天界面控制：搜索'/profile'
 //下方输出'Invalid username.'方法为chatFunc（2个参数，内部为另一个4个参数方法的调用）

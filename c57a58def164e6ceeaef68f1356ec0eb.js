@@ -2,7 +2,7 @@ const $ = (i) => document.getElementById(i);
 const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
-    this.version = '1.7';
+    this.version = '1.8';
     this.config = {};
     this.default = {
       damageDisplay: true, // 是否启用伤害显示修改
@@ -157,6 +157,7 @@ class HornexHack{
       case 'Ultra':
       case 'Super':
       case 'Hyper':
+      case 'Waveroom':
         if(!status.includes('Kills Needed')){
           return `${name} Wave: ${status}`;
         }else{
@@ -196,7 +197,10 @@ class HornexHack{
     });
   }
   respawn(){
-    $_('body > div.score-overlay > div.score-area > div.btn.continue-btn').onclick();
+    var quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
+    if(!quitBtn.classList.contains('red')){
+      quitBtn.onclick();
+    }
   }
   registerWave(){
     setInterval(() => {
@@ -248,7 +252,7 @@ hack.loadStatus();
 function getHP(mob, lst) {
   var tier = mob['tier'],
     type = mob['type'];
-  if(mob['typeStr'].includes('centipedeBody')) type--;
+  if(mob.isCentiBody) type--;
   if (!lst[tier] || tier >= lst.length) return;
   for (var i = 0; i < lst[tier].length; i++) {
     var j = lst[tier][i];
@@ -15476,9 +15480,11 @@ function a() {
         rr[yg(0x4b4)]());
       if (rq[yg(0xa7b)]) {
         rr[yg(0x89c)] = 0x1;
+        var hp = Math.round(rq.health * 100);
+        var shield = Math.round(rq.shield * 100);
         const rx = pt(
           rr,
-          yg(0x671) + (rq[yg(0xc7f)] + 0x1),
+          `HP ${hp}% Shield ${shield}% ` + yg(0x671) + (rq[yg(0xc7f)] + 0x1),
           rs ? 0xc : 0xe,
           yg(0x737),
           0x3,
