@@ -12121,9 +12121,9 @@ function getHP(mob, lst) {
         var shield = Math.round(rq.shield * 100);
         const rx = pt(
           rr,
-          `HP ${hp}% Shield ${shield}% ` + yg(0x671) + (rq[yg(0xc7f)] + 0x1),
+          `HP ${hp}% Shield ${shield}% ` + yg(0xc81) + (rq[yg(0xb14)] + 0x1),
           rs ? 0xc : 0xe,
-          yg(0x737),
+          yg(0xb5c),
           0x3,
           !![]
         );
