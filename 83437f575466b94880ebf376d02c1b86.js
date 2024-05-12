@@ -3,15 +3,16 @@ const $ = (i) => document.getElementById(i);
 const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
-    this.version = '1.8';
+    this.version = '1.10';
     this.config = {};
     this.default = {
-      damageDisplay: true, // 是否启用伤害显示修改
-      DDenableNumber: true, // 是否显示伤害数值而不是百分比（若可用）
-      healthDisplay: true, // 是否启用血量显示
+      damageDisplay: true, // 伤害显示修改
+      DDenableNumber: true, // 显示伤害数值而不是百分比（若可用）
+      healthDisplay: true, // 血量显示
       disableChatCheck: true, // 是否禁用聊天内容检查
-      autoRespawn: true, // 是否启用自动重生
-      colorText: false, // 是否启用公告彩字
+      autoRespawn: true, // 自动重生
+      colorText: false, // 公告彩字
+      betterXP: true, // 经验条优化
     };
     this.configKeys = Object.keys(this.default);
     this.chatFunc = null;
@@ -39,6 +40,12 @@ class HornexHack{
       '/help': 'show this help',
       '/server': 'get current server',
       '/wave': 'get wave progress',
+    };
+    this.hp = 0;
+    this.ingame = false;
+    this.player = {
+      name: "",
+      entity: null
     };
   }
   // ----- Notice -----
@@ -100,36 +107,40 @@ class HornexHack{
     }else{
       this.addChat(`Module or config not found: ${module}`, '#ff7f50');
     }
-    this.save();
+    this.saveModule();
   }
-  list(){
+  listModule(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
       this.addChat(`${item}: ${this.isEnabled(item)} (defaults to ${this.default[item]})`, '#ffffff');
     }
   }
-  save(){
+  saveModule(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
       localStorage.setItem(`hh${item}`, this.isEnabled(item));
     }
   }
-  load(){
+  loadModule(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
-      this.setEnabled(item, localStorage.getItem(`hh${item}`));
       if(!localStorage.getItem(`hh${item}`)){
         this.config[item] = this.default[item];
         this.setEnabled(item, this.default[item]);
+      }else{
+        this.setEnabled(item, localStorage.getItem(`hh${item}`));
       }
     }
   }
   // ----- Command -----
+  preload(){
+    this.loadModule();
+  }
   onload(){
-    this.load();
     this.addChat(`${this.name} enabled!`);
     this.addChat('Type /help in chat box to get help');
     this.register();
+    this.ingame = true;
   }
   notCommand(cmd){
     return cmd[0] == '/' && !Object.keys(this.commands).includes(cmd);
@@ -168,6 +179,10 @@ class HornexHack{
         return 'Not in Ultra/Super/Hyper zone';
     }
   }
+  log(text){
+    if(text == '') console.log('<empty str>');
+    else console.log(text);
+  }
   command2Arg(func, args){
     args = args.split(' ');
     if(args.length != 2){
@@ -186,8 +201,9 @@ class HornexHack{
         mutations.forEach(function(mutation) {
             if (mutation.type == 'attributes') {
               var style = mutation.target.style;
-              if(style.display != 'none' && that.isEnabled('autoRespawn')){
-                that.respawn();
+              if(style.display != 'none'){
+                that.ingame = false;
+                if(that.isEnabled('autoRespawn')) that.respawn();
               }
             }
         });
@@ -204,7 +220,7 @@ class HornexHack{
     }
   }
   registerWave(){
-    setInterval(() => {
+    this.waveInterval = setInterval(() => {
       var status = this.getWave();
       var server = this.getServer();
       this.setStatus(`${server}: ${status}`);
@@ -232,7 +248,7 @@ class HornexHack{
                   }
                 }
               }
-              console.log(name + ' ' + content);
+              //hack.log(name + ' ' + content);
             }
           }
         });
@@ -241,9 +257,22 @@ class HornexHack{
       childList: true
     });
   }
+  registerKey(){
+    var chatbox = $_('body > div.common > div.chat > input');
+    this.keyFunc = evt => {
+      if(document.activeElement.classList == chatbox.classList || !this.ingame) return;
+      if(evt.key == 'q'){
+        var x = this.player.entity.targetPlayer.nx;
+        var y = this.player.entity.targetPlayer.ny;
+        this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`)
+      }
+    };
+    window.addEventListener('keyup', this.keyFunc);
+  }
   register(){
     this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
-    this.registerWave();
+    if(!this.waveInterval) this.registerWave();
+    if(!this.keyFunc) this.registerKey();
     if(!this.chatObserver) this.registerChat();
     if(!this.dieObserver) this.registerDie();
   }
@@ -4794,6 +4823,7 @@ function getHP(mob, lst) {
     function hX() {
       const vd = uf;
       console[vd(0xabc)](vd(0x974)), ie();
+      hack.preload();
     }
     var hY = document[uf(0xa10)](uf(0x968));
     function hZ() {
@@ -5647,7 +5677,7 @@ function getHP(mob, lst) {
       var baseHP = getHP(ri, hack.moblst);
       var decDmg = ri['nHealth'] - rj;
       var dmg = Math.floor(decDmg * 10000) / 100 + '%';
-      if (baseHP && hack.isEnabled('DDenableNumber')) var dmg = Math.floor(decDmg * baseHP);
+      if(baseHP && hack.isEnabled('DDenableNumber')) var dmg = Math.floor(decDmg * baseHP);
       const rl = rj === void 0x0;
       !rl && (rk = Math[vG(0x435)]((ri[vG(0xc14)] - rj) * 0x64) || 0x1),
         iz[vG(0x6aa)]({
@@ -6371,6 +6401,7 @@ function getHP(mob, lst) {
             (ix = rv[w6(0x9a4)](rw)),
             (rw += 0x4),
             (jv = rm()),
+            hack.player.name = jv,
             hJ(jv),
             (jy = rv[w6(0x419)](rw++)),
             jB(),
@@ -12117,16 +12148,17 @@ function getHP(mob, lst) {
         rr[yg(0x6f2)]());
       if (rq[yg(0x5e5)]) {
         rr[yg(0x74e)] = 0x1;
-        var hp = Math.round(rq.health * 100);
-        var shield = Math.round(rq.shield * 100);
+        var hp = Math.round(rq.health * hack.hp);
+        var shield = Math.round(rq.shield * hack.hp);
         const rx = pt(
           rr,
-          `HP ${hp}% Shield ${shield}% ` + yg(0xc81) + (rq[yg(0xb14)] + 0x1),
+          `HP ${hp}${shield ? " + " + shield : ""} ` + yg(0xc81) + (rq[yg(0xb14)] + 0x1),
           rs ? 0xc : 0xe,
           yg(0xb5c),
           0x3,
           !![]
         );
+        if(rq.username == hack.player.name) hack.player.entity = rq;
         rr[yg(0x6c0)](
           rx,
           rt + ru / 0x2 - rx[yg(0xa98)],
@@ -13121,7 +13153,7 @@ function getHP(mob, lst) {
                           hack.command2Arg('toggle', inputChat);
                         }else if(inputChat.startsWith('/list')){
                           hack.addChat('List of module and configs:');
-                          hack.list();
+                          hack.listModule();
                         }else if(inputChat.startsWith('/help')){
                           hack.getHelp();
                         }else if(inputChat.startsWith('/server')){
@@ -13134,29 +13166,32 @@ function getHP(mob, lst) {
                         const rA = rv[zs(0x4e2)](0x9);
                         nf(rA);
                       } else {
-                        let rB = 0x0;
-                        for (let rC = 0x0; rC < nh[zs(0xbc8)]; rC++) {
-                          ni(rv, nh[rC]) > 0.95 && rB++;
-                        }
-                        rB >= 0x3 && (nc += 0xa);
-                        nc++;
-                        if (nc > 0x3) hK(zs(0x9b9)), (n9 = pz + 0xea60);
-                        else {
-                          nh[zs(0x6aa)](rv);
-                          if (nh[zs(0xbc8)] > 0xa) nh[zs(0x6f7)]();
-                          (rv = decodeURIComponent(
-                            encodeURIComponent(rv)
-                              [zs(0x516)](/%CC(%[A-Z0-9]{2})+%20/g, "\x20")
-                              [zs(0x516)](/%CC(%[A-Z0-9]{2})+(\w)/g, "$2")
-                          )),
-                            il(
-                              new Uint8Array([
-                                cI[zs(0x480)],
-                                ...new TextEncoder()[zs(0x6a7)](rv),
-                              ])
-                            ),
-                            (n9 = pz);
-                        }
+                        hack.speak = (txt) => {
+                          let rB = 0x0;
+                          for (let rC = 0x0; rC < nh[zs(0xbc8)]; rC++) {
+                            ni(txt, nh[rC]) > 0.95 && rB++;
+                          }
+                          rB >= 0x3 && (nc += 0xa);
+                          nc++;
+                          if (nc > 0x3) hK(zs(0x9b9)), (n9 = pz + 0xea60);
+                          else {
+                            nh[zs(0x6aa)](txt);
+                            if (nh[zs(0xbc8)] > 0xa) nh[zs(0x6f7)]();
+                            (txt = decodeURIComponent(
+                              encodeURIComponent(txt)
+                                [zs(0x516)](/%CC(%[A-Z0-9]{2})+%20/g, "\x20")
+                                [zs(0x516)](/%CC(%[A-Z0-9]{2})+(\w)/g, "$2")
+                            )),
+                              il(
+                                new Uint8Array([
+                                  cI[zs(0x480)],
+                                  ...new TextEncoder()[zs(0x6a7)](txt),
+                                ])
+                              ),
+                              (n9 = pz);
+                          }
+                        };
+                        hack.speak(inputChat)
                       }
                     }
                   }
@@ -13923,12 +13958,13 @@ function getHP(mob, lst) {
         (ot = oq - os),
         k8(
           nO,
-          Ac(0xbbc) + (or + 0x1) + Ac(0xdaf) + iJ(ot) + "/" + iJ(ou) + Ac(0x71d)
+          !hack.isEnabled('betterXP') ? (Ac(0xbbc) + (or + 0x1) + Ac(0xdaf) + iJ(ot) + "/" + iJ(ou) + Ac(0x71d)) : (Ac(0xbbc) + (or + 0x1) + Ac(0xdaf) + ot + "/" + ou + Ac(0x71d))
         );
       const rE = d6(or);
       of[Ac(0x9b4)](0xc8 * rE),
         og[Ac(0x9b4)](0x19 * rE),
         oh[Ac(0x9b4)](d5(or)),
+        hack.hp = 0xc8 * rE,
         (ow = Math[Ac(0xc0c)](0x1, ot / ou)),
         (oy = 0x0),
         (nJ[Ac(0xa10)](Ac(0xa29))[Ac(0xd6e)] =

@@ -212,3 +212,10 @@ def main():
     t.mainloop()
 if __name__ == '__main__':
     main()
+def listdps():
+    dps = []
+    for i, j in petals.items():
+        dps.append([i, j[1] / j[2]])
+    dps = sorted(dps, key=lambda x: -x[1])
+    print(dps)
+listdps()

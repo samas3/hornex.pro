@@ -13,15 +13,16 @@ const $ = (i) => document.getElementById(i);
 const $_ = (i) => document.querySelector(i);
 class HornexHack{
   constructor(){
-    this.version = '1.8';
+    this.version = '1.10';
     this.config = {};
     this.default = {
-      damageDisplay: true, // 是否启用伤害显示修改
-      DDenableNumber: true, // 是否显示伤害数值而不是百分比（若可用）
-      healthDisplay: true, // 是否启用血量显示
+      damageDisplay: true, // 伤害显示修改
+      DDenableNumber: true, // 显示伤害数值而不是百分比（若可用）
+      healthDisplay: true, // 血量显示
       disableChatCheck: true, // 是否禁用聊天内容检查
-      autoRespawn: true, // 是否启用自动重生
-      colorText: false, // 是否启用公告彩字
+      autoRespawn: true, // 自动重生
+      colorText: false, // 公告彩字
+      betterXP: true, // 经验条优化
     };
     this.configKeys = Object.keys(this.default);
     this.chatFunc = null;
@@ -49,6 +50,12 @@ class HornexHack{
       '/help': 'show this help',
       '/server': 'get current server',
       '/wave': 'get wave progress',
+    };
+    this.hp = 0;
+    this.ingame = false;
+    this.player = {
+      name: "",
+      entity: null
     };
   }
   // ----- Notice -----
@@ -110,36 +117,40 @@ class HornexHack{
     }else{
       this.addChat(`Module or config not found: ${module}`, '#ff7f50');
     }
-    this.save();
+    this.saveModule();
   }
-  list(){
+  listModule(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
       this.addChat(`${item}: ${this.isEnabled(item)} (defaults to ${this.default[item]})`, '#ffffff');
     }
   }
-  save(){
+  saveModule(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
       localStorage.setItem(`hh${item}`, this.isEnabled(item));
     }
   }
-  load(){
+  loadModule(){
     for(var i = 0; i < this.configKeys.length; i++){
       var item = this.configKeys[i];
-      this.setEnabled(item, localStorage.getItem(`hh${item}`));
       if(!localStorage.getItem(`hh${item}`)){
         this.config[item] = this.default[item];
         this.setEnabled(item, this.default[item]);
+      }else{
+        this.setEnabled(item, localStorage.getItem(`hh${item}`));
       }
     }
   }
   // ----- Command -----
+  preload(){
+    this.loadModule();
+  }
   onload(){
-    this.load();
     this.addChat(`${this.name} enabled!`);
     this.addChat('Type /help in chat box to get help');
     this.register();
+    this.ingame = true;
   }
   notCommand(cmd){
     return cmd[0] == '/' && !Object.keys(this.commands).includes(cmd);
@@ -178,6 +189,10 @@ class HornexHack{
         return 'Not in Ultra/Super/Hyper zone';
     }
   }
+  log(text){
+    if(text == '') console.log('<empty str>');
+    else console.log(text);
+  }
   command2Arg(func, args){
     args = args.split(' ');
     if(args.length != 2){
@@ -196,8 +211,9 @@ class HornexHack{
         mutations.forEach(function(mutation) {
             if (mutation.type == 'attributes') {
               var style = mutation.target.style;
-              if(style.display != 'none' && that.isEnabled('autoRespawn')){
-                that.respawn();
+              if(style.display != 'none'){
+                that.ingame = false;
+                if(that.isEnabled('autoRespawn')) that.respawn();
               }
             }
         });
@@ -214,7 +230,7 @@ class HornexHack{
     }
   }
   registerWave(){
-    setInterval(() => {
+    this.waveInterval = setInterval(() => {
       var status = this.getWave();
       var server = this.getServer();
       this.setStatus(`${server}: ${status}`);
@@ -242,7 +258,7 @@ class HornexHack{
                   }
                 }
               }
-              console.log(name + ' ' + content);
+              //hack.log(name + ' ' + content);
             }
           }
         });
@@ -251,9 +267,22 @@ class HornexHack{
       childList: true
     });
   }
+  registerKey(){
+    var chatbox = $_('body > div.common > div.chat > input');
+    this.keyFunc = evt => {
+      if(document.activeElement.classList == chatbox.classList || !this.ingame) return;
+      if(evt.key == 'q'){
+        var x = this.player.entity.targetPlayer.nx;
+        var y = this.player.entity.targetPlayer.ny;
+        this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`)
+      }
+    };
+    window.addEventListener('keyup', this.keyFunc);
+  }
   register(){
     this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
-    this.registerWave();
+    if(!this.waveInterval) this.registerWave();
+    if(!this.keyFunc) this.registerKey();
     if(!this.chatObserver) this.registerChat();
     if(!this.dieObserver) this.registerDie();
   }
@@ -279,13 +308,17 @@ hack.onload();
 //找到存储mob的列表(lst) 位于mob定义下方，形式为 xxx1 = xxx2();
 hack.moblst = xxx1;
 //onload end
+//preload:
+//搜索输出'Connected!'，在下方插入
+hack.preload();
+//preload end
 
 //伤害显示：
 //搜索show_damage，方法中插入
 var baseHP = getHP(方法的第一个参数, hack.moblst);
 var decDmg = 方法的第一个参数['nHealth'] - 方法的第二个参数;
 var dmg = Math.floor(decDmg * 10000) / 100 + '%';
-if (baseHP && hack.isEnabled('DDenableNumber')) var dmg = Math.floor(decDmg * baseHP);
+if(baseHP && hack.isEnabled('DDenableNumber')) var dmg = Math.floor(decDmg * baseHP);
 //替换下方text键对应的值
 {
   text: hack.isEnabled('damageDisplay') ? dmg : 原来的变量
@@ -325,9 +358,10 @@ if(hack.isEnabled('healthDisplay')) 方法的第二个参数.drawImage(
   health2.worldH
 );
 //在'Lvl '对应调用的方法参数前插入
-var hp = Math.round(方法的第一个参数.health * 100);
-var shield = Math.round(方法的第一个参数.shield * 100);
-`HP ${hp}% Shield ${shield}% ` + 第二个参数后面内容
+if(方法的第一个参数.username == hack.player.name) hack.player.entity = 方法的第一个参数;
+var hp = Math.round(方法的第一个参数.health * hack.hp);
+var shield = Math.round(方法的第一个参数.shield * hack.hp);
+`HP ${hp}${shield ? " + " + shield : ""} ` + 第二个参数后面内容
 
 //聊天界面控制：搜索'/profile'
 //下方输出'Invalid username.'方法为chatFunc（2个参数，内部为另一个4个参数方法的调用）
@@ -337,7 +371,7 @@ if(inputChat.startsWith('/toggle')){
   hack.command2Arg('toggle', inputChat);
 }else if(inputChat.startsWith('/list')){
   hack.addChat('List of module and configs:');
-  hack.list();
+  hack.listModule();
 }else if(inputChat.startsWith('/help')){
   hack.getHelp();
 }else if(inputChat.startsWith('/server')){
@@ -348,6 +382,11 @@ if(inputChat.startsWith('/toggle')){
   hack.addError('Invalid command!');
 }
 //下方if改成else if！！
+//下方if语句改为
+hack.speak = txt => {
+  //原来的内容（将field1替换为txt）
+};
+hack.speak(inputChat);
 
 //禁用聊天检查：搜索'[censored]'
 //在方法开头插入
@@ -358,3 +397,11 @@ if(hack.isEnabled('disableChatCheck')) return 方法的第一个参数;
 /*
 @@||hornex.pro/weborama.js$xhr,1p
 */
+
+//经验相关：搜索' XP'，在第二个调用方法下方插入
+hack.hp = 0xc8 * 变量;
+上方横线所在的值改为
+!hack.isEnabled('betterXP') ? 原来的变量 : 修改后的变量
+
+//玩家相关：搜索'.stats .dialog-header span'，在下方方法中调用它的位置上方插入
+hack.player.name = 变量;
