@@ -274,7 +274,10 @@ class HornexHack{
       if(evt.key == 'q'){
         var x = this.player.entity.targetPlayer.nx;
         var y = this.player.entity.targetPlayer.ny;
-        this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`)
+        if(this.speak) this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`);
+        else{
+          hack.addChat('You need to send something into chat to enable this!', '#ff7f50');
+        }
       }
     };
     window.addEventListener('keyup', this.keyFunc);
@@ -402,6 +405,7 @@ if(hack.isEnabled('disableChatCheck')) return 方法的第一个参数;
 hack.hp = 0xc8 * 变量;
 上方横线所在的值改为
 !hack.isEnabled('betterXP') ? 原来的变量 : 修改后的变量
+//两处都改（另一处为+ xxx XP
 
 //玩家相关：搜索'.stats .dialog-header span'，在下方方法中调用它的位置上方插入
 hack.player.name = 变量;

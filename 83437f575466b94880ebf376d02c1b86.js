@@ -264,7 +264,10 @@ class HornexHack{
       if(evt.key == 'q'){
         var x = this.player.entity.targetPlayer.nx;
         var y = this.player.entity.targetPlayer.ny;
-        this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`)
+        if(this.speak) this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`);
+        else{
+          hack.addChat('You need to send something into chat to enable this!', '#ff7f50');
+        }
       }
     };
     window.addEventListener('keyup', this.keyFunc);
@@ -14082,7 +14085,7 @@ function getHP(mob, lst) {
         (nR = ![]),
         (nQ = 0x0),
         (ov = Math[Ak(0xc0c)](0x1, (ot + oz) / ou) || 0x0),
-        k8(nN, oz > 0x0 ? "+" + iJ(oz) + Ak(0x71d) : "");
+        k8(nN, oz > 0x0 ? (!hack.isEnabled('betterXP') ? "+" + iJ(oz) + Ak(0x71d) : "+" + oz + Ak(0x71d)) : "");
     }
     var oJ,
       oK = 0x0,
