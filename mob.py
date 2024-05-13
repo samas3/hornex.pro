@@ -13,7 +13,7 @@ petals = {
     'Cotton': [15, 1, 1],
     'Magnet': [15, 5, 1.5],
     'Peas': [25, 25, 1],
-    'YinYang': [10, 10, 2],
+    'YinYang': [10, 20, 1.5],
     'Web': [5, 5, 3.5],
     'Grapes': [20, 3 + 40, 2],
     'Heavy': [600, 20, 10],
@@ -50,7 +50,7 @@ petals = {
     'Sunflower': [10, 10, 1],
     'Stickbug': [10, 18, 1],
     'Mushroom': [5, 5, 0.8],
-    'Sword': [5, 17, 1],
+    'Sword': [5, 21, 1],
     'Avacado': [70, 1, 2],
     'Dice': [20, 10, 1.6]
 }

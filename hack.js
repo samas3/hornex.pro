@@ -303,21 +303,21 @@ function getHP(mob, lst) {
   }
 }
 //onload:
-//搜索.play-btn，在其onclick事件的方法开头插入
+//搜索.play-btn，在其onclick事件的方法开头插入（方法：kG）
 hack.chatFunc = 下方所示chatFunc;
 //搜索'Loaded Build #'，参数是它的方法为toastFunc
 hack.toastFunc = toastFunc;
-hack.onload();
+if(方法的第一个参数) hack.onload();
 //找到存储mob的列表(lst) 位于mob定义下方，形式为 xxx1 = xxx2();
 hack.moblst = xxx1;
 //onload end
 //preload:
-//搜索输出'Connected!'，在下方插入
+//搜索输出'Connected!'，在下方插入（方法：hX）
 hack.preload();
 //preload end
 
 //伤害显示：
-//搜索show_damage，方法中插入
+//搜索show_damage，方法中插入（方法：iT）
 var baseHP = getHP(方法的第一个参数, hack.moblst);
 var decDmg = 方法的第一个参数['nHealth'] - 方法的第二个参数;
 var dmg = Math.floor(decDmg * 10000) / 100 + '%';
@@ -328,7 +328,7 @@ if(baseHP && hack.isEnabled('DDenableNumber')) var dmg = Math.floor(decDmg * bas
 }
 
 //血量显示：
-//搜索'Lvl '，在if语句的else最后插入
+//搜索'Lvl '，在if语句的else最后插入（方法：lZ）
 var genCanvas = xxx; // xxx 为一个7个参数的方法，参考上方drawImage第一个参数
 const health = genCanvas(
   方法的第二个参数,
@@ -366,7 +366,7 @@ var hp = Math.round(方法的第一个参数.health * hack.hp);
 var shield = Math.round(方法的第一个参数.shield * hack.hp);
 `HP ${hp}${shield ? " + " + shield : ""} ` + 第二个参数后面内容
 
-//聊天界面控制：搜索'/profile'
+//聊天界面控制：搜索'/profile'（表达式：/%CC(%[A-Z0-9]{2})+%20/）
 //下方输出'Invalid username.'方法为chatFunc（2个参数，内部为另一个4个参数方法的调用）
 //startWith的调用者为field1
 var inputChat = field1;
@@ -391,7 +391,7 @@ hack.speak = txt => {
 };
 hack.speak(inputChat);
 
-//禁用聊天检查：搜索'[censored]'
+//禁用聊天检查：搜索'[censored]'（方法：fb）
 //在方法开头插入
 if(hack.isEnabled('disableChatCheck')) return 方法的第一个参数;
 
@@ -401,11 +401,11 @@ if(hack.isEnabled('disableChatCheck')) return 方法的第一个参数;
 @@||hornex.pro/weborama.js$xhr,1p
 */
 
-//经验相关：搜索' XP'，在第二个调用方法下方插入
+//经验相关：搜索' XP'，在第二个调用方法下方插入（方法：oA）
 hack.hp = 0xc8 * 变量;
 上方横线所在的值改为
-!hack.isEnabled('betterXP') ? 原来的变量 : 修改后的变量
-//两处都改（另一处为+ xxx XP
+!hack.isEnabled('betterXP') ? 原来的变量 : 修改后的变量 // 去除iJ
+//两处都改（另一处为+ xxx XP，方法：oI）
 
-//玩家相关：搜索'.stats .dialog-header span'，在下方方法中调用它的位置上方插入
+//玩家相关：搜索'.stats .dialog-header span'，在下方方法中调用它的位置上方插入（方法：k1）
 hack.player.name = 变量;
