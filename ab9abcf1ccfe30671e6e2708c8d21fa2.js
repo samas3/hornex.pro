@@ -273,6 +273,12 @@ class HornexHack{
         if(!this.triggerKeys.includes(module)) this.toggle(module);
         else this.triggers[module]();
     }
+    delBuild(id){
+      let builds = JSON.parse(localStorage.getItem('saved_builds'));
+      delete builds[id];
+      localStorage.setItem('saved_builds', JSON.stringify(builds));
+      this.addChat('Deleted build #' + id + ', refresh to view changes');
+    }
     commandMultiArg(func, num, args){
         args = args.split(' ');
         if(args.length != num){
@@ -17116,9 +17122,8 @@ function b(c, d) {
                         }else if(inputChat.startsWith('/bind')){
                             hack.commandMultiArg('bindKey', 3, inputChat);
                             hack.saveModule();
-                        }else if(inputChat.startsWith('/bind')){
-                            hack.commandMultiArg('bindKey', 3, inputChat);
-                            hack.saveModule();
+                        }else if(inputChat.startsWith('/delBuild')){
+                            hack.commandMultiArg('delBuild', 2, inputChat);
                         }else if(hack.notCommand(inputChat.split(' ')[0])){
                             hack.addError('Invalid command!');
                         }else if (rL[A5(0x307)](A5(0x9fa))) {
