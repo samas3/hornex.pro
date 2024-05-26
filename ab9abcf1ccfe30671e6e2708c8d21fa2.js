@@ -16,6 +16,14 @@ const GUIUtil = {
         };
         box.appendChild(close);
         document.body.appendChild(box);
+    },
+    createInfoBox: function(){
+        let div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.padding = '10px';
+        div.style.zIndex = '10000';
+        document.body.appendChild(div);
+        return div;
     }
   }
 class HornexHack{
@@ -31,6 +39,7 @@ class HornexHack{
             colorText: false, // 公告彩字
             numberNoSuffix: true, // 取消数字单位显示
             lockBuildChange: false, // 禁止更改Build
+            forceLoadScript: false, // 在脚本报错后自动刷新
         };
         this.configKeys = Object.keys(this.default);
         this.chatFunc = null;
@@ -94,13 +103,9 @@ class HornexHack{
         return arr.slice(-1).concat(arr.slice(0, -1))
     }
     loadStatus(){
-        let div = document.createElement('div');
-        div.style.position = 'fixed';
+        let div = GUIUtil.createInfoBox();
         div.style.bottom = '60px';
         div.style.right = '0';
-        div.style.padding = '10px';
-        div.style.zIndex = '10000';
-        document.body.appendChild(div);
         this.status.style.fontSize = '15px';
         let colors = ['red', 'yellow', 'lime', 'cyan', 'blue', 'magenta'];
         this.status.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
@@ -223,7 +228,7 @@ class HornexHack{
         this.ingame = true;
     }
     notCommand(cmd){
-        return cmd[0] == '/' && !Object.keys(this.commands).includes(cmd);
+        return cmd[0] == '/' && !Object.keys(this.commands).map(x => (x.split(' ')[0])).includes(cmd);
     }
     getHelp(){
         this.addChat('List of commands:');
@@ -246,17 +251,17 @@ class HornexHack{
         let start = prog.indexOf('calc(') + 5;
         prog = prog.substr(start, prog.indexOf('%') - start);
         switch(name){
-        case 'Ultra':
-        case 'Super':
-        case 'Hyper':
-        case 'Waveroom':
-            if(!status.includes('Kills Needed')){
-                return `${name} Wave: ${status}`;
-            }else{
-                return `${name} Wave: ${Math.round((100 + parseFloat(prog)) * 100) / 100}%`;
-            }
-        default:
-            return 'Not in Ultra/Super/Hyper zone';
+            case 'Ultra':
+            case 'Super':
+            case 'Hyper':
+            case 'Waveroom':
+                if(!status.includes('Kills Needed')){
+                    return `${name} Wave: ${status}`;
+                }else{
+                    return `${name} Wave: ${Math.round((100 + parseFloat(prog)) * 100) / 100}%`;
+                }
+            default:
+                return 'Not in Ultra/Super/Hyper zone';
         }
     }
     getHP(mob) {
@@ -321,7 +326,7 @@ class HornexHack{
             try{
                 status = this.getWave();
             }catch{
-                location.reload();
+                if(this.isEnabled('forceLoadScript')) location.reload();
             }
             let server = this.getServer();
             this.setStatus(`${server}: ${status}`);
@@ -365,11 +370,11 @@ class HornexHack{
     registerKey(){
         let chatbox = $_('body > div.common > div.chat > input');
         this.keyFunc = evt => {
-        if(document.activeElement.classList == chatbox.classList || !this.ingame) return;
-        for(let i = 0; i < Object.keys(this.bindKeys).length; i++){
-            let item = Object.keys(this.bindKeys)[i];
-            if(evt.key == this.bindKeys[item]) this.onKey(item);
-        }
+            if(document.activeElement.classList == chatbox.classList || !this.ingame) return;
+            for(let i = 0; i < Object.keys(this.bindKeys).length; i++){
+                let item = Object.keys(this.bindKeys)[i];
+                if(evt.key == this.bindKeys[item]) this.onKey(item);
+            }
         };
         window.addEventListener('keyup', this.keyFunc);
     }
@@ -9229,8 +9234,8 @@ function b(c, d) {
       if (!pb[vW(0x9ea)]) return;
       let baseHP = hack.getHP(ry);
       let decDmg = ry['nHealth'] - rz;
-      let dmg = Math.floor(decDmg * 10000) / 100 + '%';
-      if(baseHP && hack.isEnabled('DDenableNumber')) dmg = Math.floor(decDmg * baseHP);
+      let dmg = Math.round(decDmg * 10000) / 100 + '%';
+      if(baseHP && hack.isEnabled('DDenableNumber')) dmg = Math.round(decDmg * baseHP);
       let rA;
       const rB = rz === void 0x0;
       !rB && (rA = Math[vW(0x9f9)]((ry[vW(0x60c)] - rz) * 0x64) || 0x1),
@@ -15768,7 +15773,7 @@ function b(c, d) {
         const genCanvas = pJ;
         const health = genCanvas(
           rH,
-          `${Math.floor(rG['health'] * hack.getHP(rG))} (${Math.floor(rG['health'] * 100)}%)`,
+          `${Math.round(rG['health'] * hack.getHP(rG))} (${Math.round(rG['health'] * 100)}%)`,
           30,
           hack.getColor(rG),
           3,
