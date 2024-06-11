@@ -25,10 +25,10 @@ const GUIUtil = {
         document.body.appendChild(div);
         return div;
     }
-  }
+}
 class HornexHack{
     constructor(){
-        this.version = '2.0';
+        this.version = '2.2';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
@@ -44,6 +44,8 @@ class HornexHack{
         this.configKeys = Object.keys(this.default);
         this.chatFunc = null;
         this.toastFunc = null;
+        this.numFunc = null;
+        this.mobFunc = null;
         this.moblst = null;
         this.rarityColor = [
             '#7eef6d',
@@ -71,6 +73,8 @@ class HornexHack{
             '/bind <module> clear': 'clear a module\'s keybind',
             '/open': 'open the config gui',
             '/delBuild <id>': 'delete a build',
+            '/viewPetal <id>': 'view a petal(add it into Build #49)',
+            '/viewMob <id>': 'view a mob(add it to zone mobs)',
         };
         this.hp = 0;
         this.ingame = false;
@@ -86,7 +90,7 @@ class HornexHack{
                 let y = this.player.entity.targetPlayer.ny;
                 if(this.speak) this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`);
                 else{
-                this.addChat('You need to send something into chat to enable this!', '#ff7f50');
+                    this.addChat('You need to send something into chat to enable this!', '#ff7f50');
                 }
             },
         };
@@ -149,15 +153,13 @@ class HornexHack{
         this.saveModule();
     }
     listModule(){
-        for(let i = 0; i < this.configKeys.length; i++){
-            let item = this.configKeys[i];
+        for(const item of this.configKeys){
             this.addChat(`${item}: ${this.isEnabled(item)} (defaults to ${this.default[item]})`, '#ffffff');
         }
     }
     openGUI(){
         let main = document.createElement('div');
-        for(let i = 0; i < this.configKeys.length; i++){
-            let item = this.configKeys[i];
+        for(const item of this.configKeys){
             let idx = document.createElement('div');
             let txt = document.createElement('span');
             txt.innerHTML = item + (Object.keys(this.bindKeys).includes(item) ? ` (Binded to ${this.bindKeys[item]})` : ' (Not bounded)');
@@ -166,7 +168,7 @@ class HornexHack{
             let cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.checked = this.isEnabled(item);
-            var that = this;
+            let that = this;
             cb.onclick = () => {
                 that.toggle(item);
             };
@@ -174,8 +176,7 @@ class HornexHack{
             idx.appendChild(cb);
             main.appendChild(idx);
         }
-        for(let i = 0; i < this.triggerKeys.length; i++){
-            let item = this.triggerKeys[i];
+        for(const item of this.triggerKeys){
             let idx = document.createElement('div');
             let txt = document.createElement('span');
             txt.innerHTML = item + (Object.keys(this.bindKeys).includes(item) ? ` (Binded to ${this.bindKeys[item]})` : ' (Not bounded)');
@@ -206,8 +207,7 @@ class HornexHack{
             this.saveModule();
             return;
         }
-        for(let i = 0; i < this.configKeys.length; i++){
-            let item = this.configKeys[i];
+        for(const item of this.configKeys){
             if(!cfg[item]){
                 this.config[item] = this.default[item];
                 this.setEnabled(item, this.default[item]);
@@ -232,9 +232,8 @@ class HornexHack{
     }
     getHelp(){
         this.addChat('List of commands:');
-        let lst = Object.keys(this.commands);
-        for(let i = 0; i < lst.length; i++){
-            this.addChat(`${lst[i]} : ${this.commands[lst[i]]}`, '#ffffff');
+        for(const [i, j] of Object.entries(this.commands)){
+            this.addChat(`${i} : ${j}`, '#ffffff');
         }
     }
     getServer(){
@@ -269,9 +268,8 @@ class HornexHack{
         let lst = this.moblst;
         if(mob.isCentiBody) type--;
         if (!lst[tier] || tier >= lst.length) return;
-        for (let i = 0; i < lst[tier].length; i++) {
-            let j = lst[tier][i];
-            if (type == j['type']) return j['health'];
+        for (const i of lst[tier]) {
+            if (type == i['type']) return i['health'];
         }
     }
     onKey(module){
@@ -282,7 +280,31 @@ class HornexHack{
       let builds = JSON.parse(localStorage.getItem('saved_builds'));
       delete builds[id];
       localStorage.setItem('saved_builds', JSON.stringify(builds));
-      this.addChat('Deleted build #' + id + ', refresh to view changes');
+      this.addChat('Deleted Build #' + id + ', refresh to view changes');
+    }
+    viewPetal(id){
+      let builds = JSON.parse(localStorage.getItem('saved_builds'));
+      builds['49'] = [id]
+      localStorage.setItem('saved_builds', JSON.stringify(builds));
+      this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
+    }
+    viewMob(name){
+      let mobs = document.querySelector('.zone-mobs');
+      let id, rarityNum = parseInt(name[name.length - 1]);
+      if(name.includes('_0')) name = name.substring(0, name.length - 2);
+      for(const i of this.moblst[rarityNum]){
+        console.log(i['name'].replaceAll(' ', ''))
+        if(i['name'].replaceAll(' ', '') == name) id = i;
+      }
+      if(!id){
+        this.addChat(`Mob not found: ${name}`, '#ff7f50');
+        return;
+      }
+      let mob = this.mobFunc(id, true);
+      mob.tooltipDown = true;
+      mobs.canShowDrops = true;
+      mobs.appendChild(mob);
+      this.addChat(`Added ${name} to zone mobs`);
     }
     commandMultiArg(func, num, args){
         args = args.split(' ');
@@ -330,7 +352,7 @@ class HornexHack{
             }
             let server = this.getServer();
             this.setStatus(`${server}: ${status}`);
-            var btn = document.getElementsByClassName('btn build-save-btn');
+            let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){
                 btn[i].style.display = this.isEnabled('lockBuildChange') ? 'none' : '';
             }
@@ -346,14 +368,15 @@ class HornexHack{
                         let childs = chat.childNodes;
                         let name = "", content = "";
                         for(let i = 0; i < childs.length; i++){
-                            if(childs[i].className == 'chat-name') name = childs[i].getAttribute('stroke');
-                            if(childs[i].className == 'chat-text'){
-                                if(childs[i].hasAttribute('stroke')){
-                                    content = childs[i].getAttribute('stroke');
+                            let item = childs[i];
+                            if(item.className == 'chat-name') name = item.getAttribute('stroke');
+                            if(item.className == 'chat-text'){
+                                if(item.hasAttribute('stroke')){
+                                    content = item.getAttribute('stroke');
                                 }else{
-                                    let c = childs[i].childNodes;
-                                    for(let i = 0; i < c.length - 1; i += 2){
-                                        name += c[i].getAttribute('stroke') + ' ';
+                                    let c = item.childNodes;
+                                    for(let j = 0; j < c.length - 1; j += 2){
+                                        name += c[j].getAttribute('stroke') + ' ';
                                     }
                                 }
                             }
@@ -377,6 +400,17 @@ class HornexHack{
             }
         };
         window.addEventListener('keyup', this.keyFunc);
+    }
+    updateMob(mob){
+      if(mob['isShiny']){
+        let x = Math.floor(mob['nx'] / 500), y = Math.floor(mob['ny'] / 500);
+        let tier = mob['tierStr'], type = this.moblst, cur;
+        for(const i of type[mob['tier']]){
+          if(i['type'] == mob['type']) cur = i;
+        }
+        let name = cur['uiName'];
+        this.addChat(`A shiny ${tier} ${name} spawned at ${x}, ${y}`, '#ff7f50');
+      }
     }
     register(){
         this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
@@ -4928,6 +4962,8 @@ hack.loadStatus();
     function hW() {
       const vs = uu;
       console[vs(0x21f)](vs(0x94f)), ic();
+      hack.chatFunc = hJ;
+      hack.numFunc = iI;
       hack.preload();
     }
     var hX = document[uu(0x5d6)](uu(0x317));
@@ -5779,10 +5815,11 @@ hack.loadStatus();
     function iS(rx, ry) {
       const vV = uu;
       if (!pa[vV(0x795)]) return;
-      let baseHP = hack.getHP(ry);
+      let baseHP = hack.getHP(rx);
       let decDmg = rx['nHealth'] - ry;
       let dmg = Math.round(decDmg * 10000) / 100 + '%';
       if(baseHP && hack.isEnabled('DDenableNumber')) dmg = Math.round(decDmg * baseHP);
+      if(isNaN(dmg)) dmg = '';
       let rz;
       const rA = rx === void 0x0;
       !rA && (rz = Math[vV(0xbeb)]((rx[vV(0x6b6)] - rx) * 0x64) || 0x1),
@@ -6920,6 +6957,7 @@ hack.loadStatus();
                 if (!j5[wl(0x833)][tS]) {
                   tQ = !![];
                   const tU = nU(eJ[tS], !![]);
+                  hack.mobFunc = nU;
                   (tU[wl(0x9b0)] = !![]),
                     (tU[wl(0xa03)] = ![]),
                     tU[wl(0x487)][wl(0x5e5)](wl(0x958)),
@@ -7278,7 +7316,6 @@ hack.loadStatus();
     };
     function kF(rC = ![]) {
       const wR = uu;
-      hack.chatFunc = hJ;
       hack.toastFunc = hb;
       if(rC) hack.onload();
       hack.moblst = eN;
@@ -12318,6 +12355,7 @@ hack.loadStatus();
           rS[yv(0xd81)]
         );
         const genCanvas = pI;
+        hack.updateMob(rF);
         const health = genCanvas(
           rG,
           `${Math.round(rF['health'] * hack.getHP(rF))} (${Math.round(rF['health'] * 100)}%)`,
@@ -13676,7 +13714,11 @@ hack.loadStatus();
                           hack.saveModule();
                       }else if(inputChat.startsWith('/delBuild')){
                           hack.commandMultiArg('delBuild', 2, inputChat);
-                      }else if(hack.notCommand(inputChat.split(' ')[0])){
+                      }else if(inputChat.startsWith('/viewPetal')){
+                        hack.commandMultiArg('viewPetal', 2, inputChat);
+                      }else if(inputChat.startsWith('/viewMob')){
+                        hack.commandMultiArg('viewMob', 2, inputChat);
+                   }else if(hack.notCommand(inputChat.split(' ')[0])){
                           hack.addError('Invalid command!');
                       }else
                       if (rK[A4(0xa69)](A4(0x8dc))) {
