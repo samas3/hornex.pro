@@ -86,9 +86,8 @@ class HornexHack{
         this.triggers = {
             'openGUI': () => this.openGUI(),
             'sendCoords': () => {
-                let x = this.player.entity.targetPlayer.nx;
-                let y = this.player.entity.targetPlayer.ny;
-                if(this.speak) this.speak(`Current coords: ${Math.floor(x / 500)}, ${Math.floor(y / 500)}`);
+                let coords = this.getPos();
+                if(this.speak) this.speak(`Current coords: ${coords.join(', ')}`);
                 else{
                     this.addChat('You need to send something into chat to enable this!', '#ff7f50');
                 }
@@ -276,6 +275,11 @@ class HornexHack{
         if(!this.triggerKeys.includes(module)) this.toggle(module);
         else this.triggers[module]();
     }
+    getPos(){
+        let x = this.player.entity.targetPlayer.nx;
+        let y = this.player.entity.targetPlayer.ny;
+        return [Math.floor(x / 500), Math.floor(y / 500)];
+    }
     delBuild(id){
       let builds = JSON.parse(localStorage.getItem('saved_builds'));
       delete builds[id];
@@ -338,8 +342,12 @@ class HornexHack{
     }
     respawn(){
         let quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
+        this.addChat(`You died @ ${this.getPos().join(', ')}`, '#fff')
         if(!quitBtn.classList.contains('red')){
+            this.addChat('Respawning', '#fff');
             quitBtn.onclick();
+        }else{
+            this.addChat('Not respawning, you are in Waveroom', '#fff');
         }
     }
     registerMain(){
@@ -12385,6 +12393,21 @@ hack.loadStatus();
           -120,
           health2.worldW,
           health2.worldH
+        );
+        const entityId = genCanvas(
+          rG,
+          'ID: ' + rF['id'],
+          20,
+          '#fff',
+          3,
+          true
+        );
+        rG.drawImage(
+          entityId,
+          -60,
+          -90,
+          entityId.worldW,
+          entityId.worldH
         );
       }
       if (rL) {
