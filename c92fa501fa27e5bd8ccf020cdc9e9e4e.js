@@ -28,7 +28,7 @@ const GUIUtil = {
 }
 class HornexHack{
     constructor(){
-        this.version = '2.2';
+        this.version = '2.3';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
@@ -75,6 +75,7 @@ class HornexHack{
             '/delBuild <id>': 'delete a build',
             '/viewPetal <id>': 'view a petal(add it into Build #49)',
             '/viewMob <id>': 'view a mob(add it to zone mobs)',
+            '/track <id/"stop">': 'track a mob',
         };
         this.hp = 0;
         this.ingame = false;
@@ -82,6 +83,7 @@ class HornexHack{
             name: "",
             entity: null
         };
+        this.tracking = null;
         this.bindKeys = {};
         this.triggers = {
             'openGUI': () => this.openGUI(),
@@ -92,6 +94,13 @@ class HornexHack{
                     this.addChat('You need to send something into chat to enable this!', '#ff7f50');
                 }
             },
+            'toggleTrack': () => {
+                if(this.trackUI.style.display == 'none'){
+                    this.trackUI.style.display = '';
+                }else{
+                    this.trackUI.style.display = 'none';
+                }
+            }
         };
         this.triggerKeys = Object.keys(this.triggers);
     }
@@ -127,6 +136,18 @@ class HornexHack{
     }
     setStatus(content){
         this.status.innerHTML = this.name + '<br>' + content;
+    }
+    loadTrack(){
+        let div = GUIUtil.createInfoBox();
+        div.style.left = '50%';
+        div.style.top = '120px';
+        div.style.transform = 'translate(-50%, 0)';
+        div.style.alignSelf = 'center';
+        div.style.fontSize = '25px';
+        div.style.textAlign = 'center';
+        div.style.padding = '10px';
+        div.innerHTML = "Not Tracking";
+        this.trackUI = div;
     }
     // ----- Module -----
     hasModule(module){
@@ -218,12 +239,14 @@ class HornexHack{
     }
     // ----- Command -----
     preload(){
+        this.loadStatus();
         this.loadModule();
     }
     onload(){
         this.addChat(`${this.name} enabled!`);
         this.addChat('Type /help in chat box to get help');
         this.register();
+        this.loadTrack();
         this.ingame = true;
     }
     notCommand(cmd){
@@ -241,6 +264,9 @@ class HornexHack{
     }
     getColor(r){
         return this.rarityColor[r['tier']];
+    }
+    convertID(id){
+        return id.toString(36);
     }
     getWave(){
         let name = $_('body > div.hud > div.zone > div.zone-name').getAttribute('stroke');
@@ -275,40 +301,48 @@ class HornexHack{
         if(!this.triggerKeys.includes(module)) this.toggle(module);
         else this.triggers[module]();
     }
-    getPos(){
-        let x = this.player.entity.targetPlayer.nx;
-        let y = this.player.entity.targetPlayer.ny;
+    getPos(entity=this.player.entity.targetPlayer){
+        let x = entity.nx;
+        let y = entity.ny;
         return [Math.floor(x / 500), Math.floor(y / 500)];
     }
     delBuild(id){
-      let builds = JSON.parse(localStorage.getItem('saved_builds'));
-      delete builds[id];
-      localStorage.setItem('saved_builds', JSON.stringify(builds));
-      this.addChat('Deleted Build #' + id + ', refresh to view changes');
+        let builds = JSON.parse(localStorage.getItem('saved_builds'));
+        delete builds[id];
+        localStorage.setItem('saved_builds', JSON.stringify(builds));
+        this.addChat('Deleted Build #' + id + ', refresh to view changes');
     }
     viewPetal(id){
-      let builds = JSON.parse(localStorage.getItem('saved_builds'));
-      builds['49'] = [id]
-      localStorage.setItem('saved_builds', JSON.stringify(builds));
-      this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
+        let builds = JSON.parse(localStorage.getItem('saved_builds'));
+        builds['49'] = [id]
+        localStorage.setItem('saved_builds', JSON.stringify(builds));
+        this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
     }
     viewMob(name){
-      let mobs = document.querySelector('.zone-mobs');
-      let id, rarityNum = parseInt(name[name.length - 1]);
-      if(name.includes('_0')) name = name.substring(0, name.length - 2);
-      for(const i of this.moblst[rarityNum]){
-        console.log(i['name'].replaceAll(' ', ''))
-        if(i['name'].replaceAll(' ', '') == name) id = i;
-      }
-      if(!id){
-        this.addChat(`Mob not found: ${name}`, '#ff7f50');
-        return;
-      }
-      let mob = this.mobFunc(id, true);
-      mob.tooltipDown = true;
-      mobs.canShowDrops = true;
-      mobs.appendChild(mob);
-      this.addChat(`Added ${name} to zone mobs`);
+        let mobs = document.querySelector('.zone-mobs');
+        let id, rarityNum = parseInt(name[name.length - 1]);
+        if(name.includes('_0')) name = name.substring(0, name.length - 2);
+        for(const i of this.moblst[rarityNum]){
+            if(i['name'].replaceAll(' ', '') == name) id = i;
+        }
+        if(!id){
+            this.addChat(`Mob not found: ${name}`, '#ff7f50');
+            return;
+        }
+        let mob = this.mobFunc(id, true);
+        mob.tooltipDown = true;
+        mobs.canShowDrops = true;
+        mobs.appendChild(mob);
+        this.addChat(`Added ${name} to zone mobs`);
+    }
+    onTrack(id){
+        if(id == 'stop'){
+            this.tracking = null;
+            this.addChat('Stopped tracking');
+        }else{
+            this.tracking = id;
+            this.addChat(`Now tracking ${id}`);
+        }
     }
     commandMultiArg(func, num, args){
         args = args.split(' ');
@@ -342,12 +376,12 @@ class HornexHack{
     }
     respawn(){
         let quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
-        this.addChat(`You died @ ${this.getPos().join(', ')}`, '#fff')
+        this.addChat(`You died @ ${this.getPos().join(', ')}`, '#0ff')
         if(!quitBtn.classList.contains('red')){
-            this.addChat('Respawning', '#fff');
+            //this.addChat('Respawning', '#0ff');
             quitBtn.onclick();
         }else{
-            this.addChat('Not respawning, you are in Waveroom', '#fff');
+            //this.addChat('Not respawning, you are in Waveroom', '#0ff');
         }
     }
     registerMain(){
@@ -364,6 +398,7 @@ class HornexHack{
             for(let i = 0; i < btn.length; i++){
                 btn[i].style.display = this.isEnabled('lockBuildChange') ? 'none' : '';
             }
+            if(!this.ingame) this.trackUI.style.display = 'none';
         }, 1000);
     }
     registerChat(){
@@ -389,7 +424,7 @@ class HornexHack{
                                 }
                             }
                         }
-                        //hack.log(name + ' ' + content);
+                        //console.log(name + ' ' + content);
                     }
                 }
             });
@@ -409,16 +444,37 @@ class HornexHack{
         };
         window.addEventListener('keyup', this.keyFunc);
     }
+    updatePlayer(player){
+        //console.log(player);
+        if(player.id == -1){
+            this.player.name = player.username;
+            this.player.entity = player;
+        }
+    }
     updateMob(mob){
-      if(mob['isShiny']){
-        let x = Math.floor(mob['nx'] / 500), y = Math.floor(mob['ny'] / 500);
         let tier = mob['tierStr'], type = this.moblst, cur;
         for(const i of type[mob['tier']]){
-          if(i['type'] == mob['type']) cur = i;
+            if(i['type'] == mob['type']) cur = i;
         }
+        if(!cur) return;
         let name = cur['uiName'];
-        this.addChat(`A shiny ${tier} ${name} spawned at ${x}, ${y}`, '#ff7f50');
-      }
+        if(mob['isShiny'] && !mob['flag']){
+            this.addChat(`A shiny ${tier} ${name} spawned at ${this.getPos(mob).join(', ')}`, '#ff7f50');
+            mob['flag'] = 1;
+        }
+        if(this.tracking){
+            if(this.convertID(mob['id']) == this.tracking && !mob['isDead']){
+                let info = `Tracking ID: ${this.tracking}`;
+                info += `<br>Type: ${tier} ${name}`;
+                info += `<br>Health: ${Math.round(mob['health'] * 100)}%`;
+                info += `<br>Pos: ${this.getPos(mob).join(', ')}`;
+                this.trackUI.innerHTML = info;
+            }else if(mob['isDead']){
+                this.trackUI.innerHTML = `Not Tracking`;
+            }
+        }else{
+            this.trackUI.innerHTML = `Not Tracking`;
+        }
     }
     register(){
         this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
@@ -429,7 +485,6 @@ class HornexHack{
     }
 }
 var hack = new HornexHack();
-hack.loadStatus();
 (function (c, d) {
   const ut = b,
     e = c();
@@ -6553,7 +6608,6 @@ hack.loadStatus();
             (rL += 0x4),
             (ju = rB()),
             hI(ju),
-            hack.player.name = ju,
             (jx = rK[wl(0x9e8)](rL++)),
             jA(),
             (j1 = rK[wl(0x5ab)](rL)),
@@ -12311,7 +12365,7 @@ hack.loadStatus();
         rG[yv(0x5b9)]());
       if (rF[yv(0x250)]) {
         rG[yv(0xa46)] = 0x1;
-        if(rF.username == hack.player.name) hack.player.entity = rF;
+        hack.updatePlayer(rF);
         var hp = Math.round(rF.health * hack.hp);
         var shield = Math.round(rF.shield * hack.hp);
         const rO = pI(
@@ -12396,7 +12450,7 @@ hack.loadStatus();
         );
         const entityId = genCanvas(
           rG,
-          'ID: ' + rF['id'],
+          'ID: ' + hack.convertID(rF['id']),
           20,
           '#fff',
           3,
@@ -13741,6 +13795,8 @@ hack.loadStatus();
                         hack.commandMultiArg('viewPetal', 2, inputChat);
                       }else if(inputChat.startsWith('/viewMob')){
                         hack.commandMultiArg('viewMob', 2, inputChat);
+                   }else if(inputChat.startsWith('/track')){
+                        hack.commandMultiArg('onTrack', 2, inputChat);
                    }else if(hack.notCommand(inputChat.split(' ')[0])){
                           hack.addError('Invalid command!');
                       }else
