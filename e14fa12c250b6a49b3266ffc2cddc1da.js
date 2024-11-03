@@ -1,5 +1,6 @@
 const $ = (i) => document.getElementById(i);
-const $_ = (i) => document.querySelector(i);
+const $_ = (i) => document.querySelector.bind(document)(i);
+const $$_ = (i) => document.querySelectorAll.bind(document)(i);
 const GUIUtil = {
     createPopupBox: function(elem, w, h, bg='#fff'){
         let box = document.createElement('div');
@@ -28,7 +29,7 @@ const GUIUtil = {
 }
 class HornexHack{
     constructor(){
-        this.version = '2.3';
+        this.version = '2.4';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
@@ -40,6 +41,8 @@ class HornexHack{
             numberNoSuffix: true, // 取消数字单位显示
             lockBuildChange: false, // 禁止更改Build
             forceLoadScript: false, // 在脚本报错后自动刷新
+            autoClickPlay: true, // 重生后自动点击Play
+            allowInvalidCommand: false, // 允许聊天输入无效指令
         };
         this.configKeys = Object.keys(this.default);
         this.chatFunc = null;
@@ -67,8 +70,6 @@ class HornexHack{
             '/toggle <module>': 'toggle a specific module',
             '/list': 'lists all the modules and configs',
             '/help': 'show this help',
-            '/server': 'get current server',
-            '/wave': 'get wave progress',
             '/bind <module> <key>': 'bind a module to the specific key',
             '/bind <module> clear': 'clear a module\'s keybind',
             '/open': 'open the config gui',
@@ -76,6 +77,7 @@ class HornexHack{
             '/viewPetal <id>': 'view a petal(add it into Build #49)',
             '/viewMob <id>': 'view a mob(add it to zone mobs)',
             '/track <id/"stop">': 'track a mob',
+            '/change <server>': 'change server(0=eu1 1=eu2 2=as1 3=us1 4=us2 5=as2, need autoRespawn enabled)',
         };
         this.hp = 0;
         this.ingame = false;
@@ -146,6 +148,7 @@ class HornexHack{
         div.style.fontSize = '25px';
         div.style.textAlign = 'center';
         div.style.padding = '10px';
+        div.style.display = 'none';
         div.innerHTML = "Not Tracking";
         this.trackUI = div;
     }
@@ -337,13 +340,33 @@ class HornexHack{
         this.addChat(`Added ${name} to zone mobs`);
     }
     onTrack(id){
+        this.tracking = null;
+        this.trackingType = null;
+        this.clearDots();
         if(id == 'stop'){
-            this.tracking = null;
             this.addChat('Stopped tracking');
         }else{
-            this.tracking = id;
+            this.trackingType = id;
             this.addChat(`Now tracking ${id}`);
         }
+    }
+    clickPlay(time){
+        setTimeout(() => {$_('.play-btn').click()}, 1000 * time);
+    }
+    changeServer(server){
+        $$_('.btn')[13 + parseInt(server)].click();
+        this.clickPlay(3);
+        this.addChat(`Changed server to ${this.getServer()}`);
+    }
+    clearDots(){
+        this.trackUI.innerHTML = `Not Tracking`;
+        let minimap = $_('.minimap');
+        minimap.childNodes.forEach(item => {
+            if(item.classList && item.classList.contains('minimap-dot') && item.childNodes.length == 0){
+                minimap.removeChild(item);
+            }
+        });
+        this.tracking = null;
     }
     commandMultiArg(func, num, args){
         args = args.split(' ');
@@ -381,6 +404,9 @@ class HornexHack{
         if(!quitBtn.classList.contains('red')){
             //this.addChat('Respawning', '#0ff');
             quitBtn.onclick();
+            if(this.isEnabled('autoClickPlay')){
+                this.clickPlay(1);
+            }
         }else{
             //this.addChat('Not respawning, you are in Waveroom', '#0ff');
         }
@@ -400,6 +426,7 @@ class HornexHack{
                 btn[i].style.display = this.isEnabled('lockBuildChange') ? 'none' : '';
             }
             if(!this.ingame) this.trackUI.style.display = 'none';
+            this.clearDots();
         }, 1000);
     }
     registerChat(){
@@ -446,7 +473,6 @@ class HornexHack{
         window.addEventListener('keyup', this.keyFunc);
     }
     updatePlayer(player){
-        //console.log(player);
         if(player.id == -1){
             this.player.name = player.username;
             this.player.entity = player;
@@ -459,21 +485,30 @@ class HornexHack{
         }
         if(!cur) return;
         let name = cur['uiName'];
-        if(mob['isShiny'] && !mob['flag']){
-            this.addChat(`A shiny ${tier} ${name} spawned at ${this.getPos(mob).join(', ')}`, '#ff7f50');
-            mob['flag'] = 1;
+        if(mob['isShiny'] && !mob['shinyFlag']){
+            for(let i = 0; i < 1; i++) this.toastFunc(`A shiny ${tier} ${name} spawned at ${this.getPos(mob).join(', ')}`);
+            mob['shinyFlag'] = 1;
         }
-        if(this.tracking){
-            if(this.convertID(mob['id']) == this.tracking && !mob['isDead']){
-                let info = `Tracking ID: ${this.tracking}`;
-                info += `<br>Type: ${tier} ${name}`;
-                info += `<br>Health: ${Math.round(mob['health'] * 100)}%`;
-                info += `<br>Pos: ${this.getPos(mob).join(', ')}`;
-                this.trackUI.innerHTML = info;
-            }else if(mob['isDead']){
-                this.trackUI.innerHTML = `Not Tracking`;
+        if(this.trackingType){
+            let minimap = $_('.minimap');
+            if(name.replaceAll(' ', '').includes(this.trackingType)){
+                let dot = document.createElement('div');
+                dot.classList = ['minimap-dot'];
+                dot.style.left = `${mob['nx'] / 500 / 60 * 100}%`;
+                dot.style.top = `${mob['ny'] / 500 / 60 * 100}%`;
+                minimap.appendChild(dot);
+                if(this.trackUI && this.convertID(mob['id']) == this.tracking && !mob['isDead']){
+                    let info = `Tracking ID: ${this.tracking}`;
+                    info += `<br>Type: ${tier} ${name}`;
+                    info += `<br>Health: ${Math.round(mob['health'] * 100)}%`;
+                    info += `<br>Pos: ${this.getPos(mob).join(', ')}`;
+                    this.trackUI.innerHTML = info;
+                }else{
+                    this.tracking = this.convertID(mob['id']);
+                }
             }
         }else{
+            this.tracking = null;
             this.trackUI.innerHTML = `Not Tracking`;
         }
     }
@@ -12482,21 +12517,6 @@ function b(c, d) {
           health2.worldW,
           health2.worldH
         );
-        const entityId = genCanvas(
-          ctx,
-          'ID: ' + hack.convertID(mob['id']),
-          20,
-          '#fff',
-          3,
-          true
-        );
-        ctx.drawImage(
-          entityId,
-          -60,
-          -90,
-          entityId.worldW,
-          entityId.worldH
-        );
       }
       if (rO) {
         let rW = m1(rI[yC(0x2fa)]);
@@ -13814,10 +13834,6 @@ function b(c, d) {
                             hack.listModule();
                         }else if(inputChat.startsWith('/help')){
                             hack.getHelp();
-                        }else if(inputChat.startsWith('/server')){
-                            hack.addChat('Current server: ' + hack.getServer());
-                        }else if(inputChat.startsWith('/wave')){
-                            hack.addChat(hack.getWave());
                         }else if(inputChat.startsWith('/open')){
                             hack.openGUI();
                         }else if(inputChat.startsWith('/bind')){
@@ -13826,12 +13842,14 @@ function b(c, d) {
                         }else if(inputChat.startsWith('/delBuild')){
                             hack.commandMultiArg('delBuild', 2, inputChat);
                         }else if(inputChat.startsWith('/viewPetal')){
-                          hack.commandMultiArg('viewPetal', 2, inputChat);
+                            hack.commandMultiArg('viewPetal', 2, inputChat);
                         }else if(inputChat.startsWith('/viewMob')){
-                          hack.commandMultiArg('viewMob', 2, inputChat);
-                     }else if(inputChat.startsWith('/track')){
-                          hack.commandMultiArg('onTrack', 2, inputChat);
-                     }else if(hack.notCommand(inputChat.split(' ')[0])){
+                            hack.commandMultiArg('viewMob', 2, inputChat);
+                        }else if(inputChat.startsWith('/track')){
+                            hack.commandMultiArg('onTrack', 2, inputChat);
+                        }else if(inputChat.startsWith('/change')){
+                             hack.commandMultiArg('changeServer', 2, inputChat);
+                        }else if(!hack.isEnabled('allowInvalidCommand') && hack.notCommand(inputChat.split(' ')[0])){
                             hack.addError('Invalid command!');
                         }else
                       if (rN[Ab(0xef5)](Ab(0x24c))) {
