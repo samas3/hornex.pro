@@ -17,6 +17,8 @@ const GUIUtil = {
         };
         box.appendChild(close);
         document.body.appendChild(box);
+        box.close = () => document.body.removeChild(box);
+        return box;
     },
     createInfoBox: function(){
         let div = document.createElement('div');
@@ -102,7 +104,8 @@ class HornexHack{
                 }else{
                     this.trackUI.style.display = 'none';
                 }
-            }
+            },
+            'changeServer': () => this.changeGUI(),
         };
         this.triggerKeys = Object.keys(this.triggers);
     }
@@ -137,7 +140,7 @@ class HornexHack{
         }, 100);
     }
     setStatus(content){
-        this.status.innerHTML = this.name + '<br>' + content;
+        this.status.innerHTML = `<a href='https://github.com/samas3' target='_blank'>${this.name}<br>${content}</a>`;
     }
     loadTrack(){
         let div = GUIUtil.createInfoBox();
@@ -278,6 +281,7 @@ class HornexHack{
         let prog = $_('body > div.hud > div.zone > div.progress > div').style.transform;
         let start = prog.indexOf('calc(') + 5;
         prog = prog.substr(start, prog.indexOf('%') - start);
+        if(!status || !prog) return 'Not ingame';
         switch(name){
             case 'Ultra':
             case 'Super':
@@ -358,6 +362,42 @@ class HornexHack{
         this.clickPlay(3);
         this.addChat(`Changed server to ${this.getServer()}`);
     }
+    changeGUI(){
+        let main = document.createElement('div');
+        let servers = ['EU1', 'EU2', 'AS1', 'US1', 'US2', 'AS2'];
+        let userCount = [];
+        for(let i = 2; i <= 7; i++){
+            let elem = $_(`body > div.menu > div.server-area > div:nth-child(${i}) > span.small`);
+            userCount.push(elem.getAttribute('stroke').slice(0, -6));
+        }
+        let current = this.getServer();
+        for(const item of servers){
+            let idx = document.createElement('div');
+            let txt = document.createElement('span');
+            txt.innerHTML = item + ' ' + (userCount[servers.indexOf(item)] || 'UK');
+            txt.style.margin = '10px';
+            txt.style.fontSize = '20px';
+            idx.appendChild(txt);
+            let cb = document.createElement('input');
+            cb.type = 'button';
+            if(item == current){
+                cb.disabled = true;
+                cb.value = 'Current';
+            }else{
+                cb.value = 'Change to';
+            }
+            cb.setAttribute('id', servers.indexOf(item));
+            let that = this;
+            cb.onclick = () => {
+                that.changeServer(cb.getAttribute('id'));
+                that.change_gui.close();
+            };
+            cb.style.float = 'right';
+            idx.appendChild(cb);
+            main.appendChild(idx);
+        }
+        this.change_gui = GUIUtil.createPopupBox(main, 250, 250);
+    }
     clearDots(){
         this.trackUI.innerHTML = `Not Tracking`;
         let minimap = $_('.minimap');
@@ -400,7 +440,8 @@ class HornexHack{
     }
     respawn(){
         let quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
-        this.addChat(`You died @ ${this.getPos().join(', ')}`, '#0ff')
+        let deathReason = $_('body > div.score-overlay > div.score-area > span.killer').getAttribute('stroke');
+        this.addChat(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`, '#0ff')
         if(!quitBtn.classList.contains('red')){
             //this.addChat('Respawning', '#0ff');
             quitBtn.onclick();

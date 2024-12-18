@@ -10,5 +10,6 @@
 ### 关于 v2.0 后新加入的 `style.css` 文件
 - 自行下载 `Stylus` 插件并加载
 - 为 `hornex.pro` 网页新建样式，并复制 `style.css` 文件中的内容到输入框中
+- 使用 Mozilla Firefox 浏览器时，需将设置中的“默认字号”设为 18，且将“全局缩放”设为 100%
 
 详细步骤可参见 *<u>https://learn.microsoft.com/zh-cn/microsoft-edge/devtools-guide-chromium/javascript/overrides</u>*
