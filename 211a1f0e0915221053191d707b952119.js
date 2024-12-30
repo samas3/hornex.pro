@@ -31,7 +31,7 @@ const GUIUtil = {
 }
 class HornexHack{
     constructor(){
-        this.version = '2.5';
+        this.version = '2.6';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
@@ -46,6 +46,7 @@ class HornexHack{
             autoClickPlay: true, // 重生后自动点击Play
             allowInvalidCommand: false, // 允许聊天输入无效指令
             shinyAlert: true, // 显示shiny警报
+            showRealTimePickup: true, // 显示实时拾取掉落物
         };
         this.configKeys = Object.keys(this.default);
         this.chatFunc = null;
@@ -64,7 +65,7 @@ class HornexHack{
             '#2bffa3',
             '#5c74b0'
         ];
-        this.status = document.createElement('span');
+        this.status = '';
         this.name = `Hornex.PRO Hack v${this.version} by samas3`;
         this.commands = {
             '/profile <user>': '<internal> show user\'s profile',
@@ -89,6 +90,8 @@ class HornexHack{
             entity: null
         };
         this.tracking = null;
+        this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.statusAbove = ''
         this.bindKeys = {};
         this.triggers = {
             'openGUI': () => this.openGUI(),
@@ -122,26 +125,26 @@ class HornexHack{
     }
     loadStatus(){
         let div = GUIUtil.createInfoBox();
-        div.style.bottom = '60px';
+        div.style.bottom = '80px';
         div.style.right = '0';
-        this.status.style.fontSize = '15px';
+        let span = document.createElement('span');
+        span.style.fontSize = '15px';
         let colors = ['red', 'yellow', 'lime', 'cyan', 'blue', 'magenta'];
-        this.status.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
-        this.status.style.backgroundClip = 'text';
-        this.status.style.webkitTextFillColor = 'transparent';
+        //span.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
         div.style.textAlign = 'right';
-        this.status.innerHTML = this.name;
-        div.appendChild(this.status);
+        div.appendChild(span);
         setInterval(() => {
+            span.innerHTML = `<a href="https://github.com/samas3" target="_blank" class="status">${this.status}</a>`
             if(this.isEnabled('colorText')){
-                colors = this.moveElement(colors);
-                this.status.style.background = `linear-gradient(to right, ${colors.join(',')}, ${colors[0]})`
-                this.status.style.backgroundClip = 'text';
+                //colors = this.moveElement(colors);
+                //span.style.background = `linear-gradient(to right, ${colors.join(',')}, ${colors[0]})`
+                //span.style.backgroundClip = 'text';
+                //span.style.webkitTextFillColor = 'transparent';
             }
         }, 100);
     }
     setStatus(content){
-        this.status.innerHTML = `<a href='https://github.com/samas3' target='_blank'>${this.name}<br>${content}</a>`;
+        this.status = `${this.statusAbove}<br>${this.name}<br>${content}`;
     }
     loadTrack(){
         let div = GUIUtil.createInfoBox();
@@ -247,6 +250,7 @@ class HornexHack{
     // ----- Command -----
     preload(){
         this.loadStatus();
+        this.setStatus('');
         this.loadModule();
     }
     onload(){
@@ -262,7 +266,7 @@ class HornexHack{
     }
     getHelp(){
         this.addChat('List of commands:');
-        for(const [i, j] of Object.entries(this.commands)){
+        for(let [i, j] of Object.entries(this.commands)){
             this.addChat(`${i} : ${j}`, '#ffffff');
         }
     }
@@ -294,7 +298,7 @@ class HornexHack{
                     return `${name} Wave: ${Math.round((100 + parseFloat(prog)) * 100) / 100}%`;
                 }
             default:
-                return 'Not in Ultra/Super/Hyper zone';
+                return 'Not in valid zone';
         }
     }
     getHP(mob) {
@@ -329,8 +333,8 @@ class HornexHack{
     }
     viewMob(name){
         let mobs = document.querySelector('.zone-mobs');
-        let id, rarityNum = parseInt(name[name.length - 1]);
-        if(name.includes('_0')) name = name.substring(0, name.length - 2);
+        let id, rarityNum = this.parseRarity(name);
+        if(rarityNum == 0) name = id;
         for(const i of this.moblst[rarityNum]){
             if(i['name'].replaceAll(' ', '') == name) id = i;
         }
@@ -340,7 +344,7 @@ class HornexHack{
         }
         let mob = this.mobFunc(id, true);
         mob.tooltipDown = true;
-        mobs.canShowDrops = true;
+        mob.canShowDrops = true;
         mobs.appendChild(mob);
         this.addChat(`Added ${name} to zone mobs`);
     }
@@ -409,6 +413,9 @@ class HornexHack{
         });
         this.tracking = null;
     }
+    parseRarity(str){
+        return str.split('_').map(x => parseInt(x) || x);
+    }
     commandMultiArg(func, num, args){
         args = args.split(' ');
         if(args.length != num){
@@ -429,6 +436,8 @@ class HornexHack{
                     let style = mutation.target.style;
                     if(style.display != 'none'){
                         that.ingame = false;
+                        that.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
+                        that.updatePetal();
                         if(that.isEnabled('autoRespawn')) that.respawn();
                     }
                 }
@@ -553,6 +562,21 @@ class HornexHack{
             this.tracking = null;
             this.trackUI.innerHTML = `Not Tracking`;
         }
+    }
+    onPickup(petal){
+        if(petal.picked) return;
+        petal.picked = true;
+        let [name, rarity] = this.parseRarity(petal.petal.name);
+        this.petalCount[rarity]++;
+        this.updatePetal();
+    }
+    updatePetal(){
+        let info = 'Petals: ';
+        for(let i = 0; i < 8; i++){
+            info += `<span style="color:${this.rarityColor[i]}">${this.petalCount[i]}</span>/`;
+        }
+        info = info.slice(0, -1);
+        if(this.isEnabled('showRealTimePickup')) this.statusAbove = info;
     }
     register(){
         this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
@@ -7490,6 +7514,7 @@ function b(c, d) {
       const wY = ux;
       hack.toastFunc = hb;
       if(rF) hack.onload();
+      hack.mobFunc = nW;
       hack.moblst = eN;
       if (kl[wY(0x5c6)][wY(0x50f)] === wY(0x5a4)) {
         kD[wY(0x292)][wY(0xae0)](wY(0x695));
@@ -11794,7 +11819,7 @@ function b(c, d) {
           this[yl(0xe6a)] && (this[yl(0x839)] += pR / 0xc8),
             this[yl(0x812)] &&
               ((this["x"] = px(this["x"], this[yl(0x812)]["x"], 0xc8)),
-              (this["y"] = px(this["y"], this[yl(0x812)]["y"], 0xc8)));
+              (this["y"] = px(this["y"], this[yl(0x812)]["y"], 0xc8)), hack.onPickup(this));
         }
         [ux(0xaff)](rI) {
           const ym = ux;

@@ -23,3 +23,7 @@
     text-align: center;
     line-height: 30px;
 }
+.status{
+    text-decoration: none;
+    color: black;
+}
