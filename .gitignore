@@ -3,3 +3,4 @@ __pycache__
 hack.js
 1.js
 api
+*.py

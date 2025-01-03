@@ -66,7 +66,7 @@ class HornexHack{
             '#5c74b0'
         ];
         this.status = '';
-        this.name = `Hornex.PRO Hack v${this.version} by samas3`;
+        this.name = `Hornex Hack v${this.version} by samas3`;
         this.commands = {
             '/profile <user>': '<internal> show user\'s profile',
             '/dlMob <mob>': '<internal> downloas an image of a specific mob',
@@ -225,13 +225,23 @@ class HornexHack{
         this.bindKeys[module] = key;
         this.addChat(`Set keybind of ${module} to ${key}`);
     }
+    LS_set(key, value){
+        localStorage.setItem(key, value);
+    }
+    LS_get(key){
+        try{
+            return JSON.parse(localStorage.getItem(key));
+        }catch(e){
+            return localStorage.getItem(key);
+        }
+    }
     saveModule(){
-        localStorage.setItem('hhConfig', JSON.stringify(this.config));
-        localStorage.setItem('hhKeys', JSON.stringify(this.bindKeys));
+        this.LS_set('hhConfig', JSON.stringify(this.config));
+        this.LS_set('hhKeys', JSON.stringify(this.bindKeys));
     }
     loadModule(){
-        let cfg = JSON.parse(localStorage.getItem('hhConfig'));
-        let keys = JSON.parse(localStorage.getItem('hhKeys')) || {};
+        let cfg = this.LS_get('hhConfig');
+        let keys = this.LS_get('hhKeys') || {};
         if(!cfg){
             this.config = this.default;
             this.saveModule();
@@ -260,6 +270,9 @@ class HornexHack{
         this.loadTrack();
         this.ingame = true;
         $_('.player-list-btn').style.display = '';
+        this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
+        this.updatePetal();
+        // console.log(this.LS_get('player_id'));
     }
     notCommand(cmd){
         return cmd[0] == '/' && !Object.keys(this.commands).map(x => (x.split(' ')[0])).includes(cmd);
@@ -271,7 +284,7 @@ class HornexHack{
         }
     }
     getServer(){
-        let server = localStorage.getItem('server');
+        let server = this.LS_get('server');
         return `${server.substring(0, 2).toUpperCase()}${server[server.length - 1]}`;
     }
     getColor(r){
@@ -320,15 +333,15 @@ class HornexHack{
         return [Math.floor(x / 500), Math.floor(y / 500)];
     }
     delBuild(id){
-        let builds = JSON.parse(localStorage.getItem('saved_builds'));
+        let builds = this.LS_get('saved_builds');
         delete builds[id];
-        localStorage.setItem('saved_builds', JSON.stringify(builds));
+        this.LS_set('saved_builds', JSON.stringify(builds));
         this.addChat('Deleted Build #' + id + ', refresh to view changes');
     }
     viewPetal(id){
-        let builds = JSON.parse(localStorage.getItem('saved_builds'));
+        let builds = this.LS_get('saved_builds');
         builds['49'] = [id]
-        localStorage.setItem('saved_builds', JSON.stringify(builds));
+        this.LS_set('saved_builds', JSON.stringify(builds));
         this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
     }
     viewMob(name){
@@ -436,7 +449,6 @@ class HornexHack{
                     let style = mutation.target.style;
                     if(style.display != 'none'){
                         that.ingame = false;
-                        that.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
                         that.updatePetal();
                         if(that.isEnabled('autoRespawn')) that.respawn();
                     }
@@ -452,6 +464,7 @@ class HornexHack{
         let quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
         let deathReason = $_('body > div.score-overlay > div.score-area > span.killer').getAttribute('stroke');
         this.addChat(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`, '#0ff')
+        this.addChat('Petals collected: ' + this.petalCount.join('/'), '#0ff')
         if(!quitBtn.classList.contains('red')){
             //this.addChat('Respawning', '#0ff');
             quitBtn.onclick();
