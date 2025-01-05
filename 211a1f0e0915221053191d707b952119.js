@@ -31,7 +31,7 @@ const GUIUtil = {
 }
 class HornexHack{
     constructor(){
-        this.version = '2.6';
+        this.version = '2.7';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
@@ -47,6 +47,7 @@ class HornexHack{
             allowInvalidCommand: false, // 允许聊天输入无效指令
             shinyAlert: true, // 显示shiny警报
             showRealTimePickup: true, // 显示实时拾取掉落物
+            zcxJamesScript: true, // ZcxJames脚本适配
         };
         this.configKeys = Object.keys(this.default);
         this.chatFunc = null;
@@ -81,7 +82,7 @@ class HornexHack{
             '/viewPetal <id>': 'view a petal(add it into Build #49)',
             '/viewMob <id>': 'view a mob(add it to zone mobs)',
             '/track <id/"stop">': 'track a mob',
-            '/change <server>': 'change server(0=eu1 1=eu2 2=as1 3=us1 4=us2 5=as2, need autoRespawn enabled)',
+            //'/change <server>': 'change server(0=eu1 1=eu2 2=as1 3=us1 4=us2 5=as2, need autoRespawn enabled)',
         };
         this.hp = 0;
         this.ingame = false;
@@ -91,7 +92,8 @@ class HornexHack{
         };
         this.tracking = null;
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
-        this.statusAbove = ''
+        this.isSuicide = false;
+        this.statusAbove = '';
         this.bindKeys = {};
         this.triggers = {
             'openGUI': () => this.openGUI(),
@@ -264,6 +266,7 @@ class HornexHack{
         this.loadModule();
     }
     onload(){
+        this.loadModule();
         this.addChat(`${this.name} enabled!`);
         this.addChat('Type /help in chat box to get help');
         this.register();
@@ -450,7 +453,10 @@ class HornexHack{
                     if(style.display != 'none'){
                         that.ingame = false;
                         that.updatePetal();
-                        if(that.isEnabled('autoRespawn')) that.respawn();
+                        if(that.isEnabled('autoRespawn') && !that.isSuicide){
+                            that.respawn();
+                            that.isSuicide = false;
+                        }
                     }
                 }
             });
@@ -463,8 +469,18 @@ class HornexHack{
     respawn(){
         let quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
         let deathReason = $_('body > div.score-overlay > div.score-area > span.killer').getAttribute('stroke');
+        let maxScore = $_('\span.max-score').getAttribute('stroke');
+        let totalKills = $_('\span.total-kills').getAttribute('stroke');
+        let timeAlive = $_('\span.time-alive').getAttribute('stroke');
         this.addChat(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`, '#0ff')
-        this.addChat('Petals collected: ' + this.petalCount.join('/'), '#0ff')
+        let box = GUIUtil.createPopupBox(document.createElement('div'), 300, 150);
+        box.appendChild(document.createTextNode('Petals collected: ' + this.petalCount.join('/')))
+        box.appendChild(document.createElement('br'));
+        box.appendChild(document.createTextNode('Max Score: ' + maxScore));
+        box.appendChild(document.createElement('br'));
+        box.appendChild(document.createTextNode('Total Kills: ' + totalKills));
+        box.appendChild(document.createElement('br'));
+        box.appendChild(document.createTextNode('Time Alive: ' + timeAlive));
         if(!quitBtn.classList.contains('red')){
             //this.addChat('Respawning', '#0ff');
             quitBtn.onclick();
@@ -476,7 +492,7 @@ class HornexHack{
         }
     }
     registerMain(){
-        this.mainInterval = setInterval(() => {
+        this.mainInterval = setInterval(async () => {
             let status;
             try{
                 status = this.getWave();
@@ -484,6 +500,19 @@ class HornexHack{
                 if(this.isEnabled('forceLoadScript')) location.reload();
             }
             let server = this.getServer();
+            let lastUpdated;
+            if(this.isEnabled('zcxJamesScript') && status){
+                lastUpdated = new Date().getTime();
+                let [zone, prog] = status.split(' Wave: ');
+                if(zone && ['Ultra', 'Super', 'Hyper'].includes(zone) && new Date().getTime() - lastUpdated >= 5000){
+                    const data = { server: server.toLowerCase(), zone: zone, progress: prog };
+                    await fetch('http://103.193.151.90:5000', {
+                        method: 'POST',
+                        body: JSON.stringify(data),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+            }
             this.setStatus(`${server}: ${status}`);
             let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){
@@ -6280,6 +6309,7 @@ function b(c, d) {
     }
     var jv = document[ux(0x546)](ux(0x42b));
     jv[ux(0x8cd)] = nw(function (rC) {
+      hack.isSuicide = true;
       const wi = ux;
       iz && im(new Uint8Array([cH[wi(0xb5d)]]));
     });
@@ -6728,6 +6758,7 @@ function b(c, d) {
               sp = rE();
             rR[ws(0x9db)]([sn || ws(0x551) + sm, so, sp]);
           }
+          console.log(rR);
           jn(rR);
           break;
         case cH[ws(0xa81)]:
