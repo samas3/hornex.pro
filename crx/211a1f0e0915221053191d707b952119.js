@@ -114,6 +114,47 @@ class HornexHack{
             'changeServer': () => this.changeGUI(),
         };
         this.triggerKeys = Object.keys(this.triggers);
+        // Style
+        let style = document.createElement('style');
+        style.innerHTML = `.p-box{
+            background-color: #fff;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            margin: auto;
+            box-sizing: border-box;
+            border-radius: 6px;
+            padding: 1em;
+        }
+        .p-close{
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            position: absolute;
+            right: -10px;
+            top: -10px;
+            border: 2px solid #fff;
+            cursor: pointer;
+            background-color: #ff7f7f;
+            text-align: center;
+            line-height: 30px;
+        }
+        .status{
+            text-decoration: none;
+            color: #ff0;
+        }
+        .watch-ad{
+            display: none;
+        }
+        .featured{
+            display: none;
+        }
+        .video{
+            display: none;
+        }`;
+        document.getElementsByTagName('head')[0].appendChild(style);
     }
     // ----- Notice -----
     addChat(text, color='#ff00ff'){
@@ -430,7 +471,7 @@ class HornexHack{
         this.tracking = null;
     }
     parseRarity(str){
-        return str.split('_').map(x => parseInt(x) || x);
+        return str.includes('_') ? str.split('_').map(x => parseInt(x) || x) : [str, 0];
     }
     commandMultiArg(func, num, args){
         args = args.split(' ');
@@ -455,8 +496,8 @@ class HornexHack{
                         that.updatePetal();
                         if(that.isEnabled('autoRespawn') && !that.isSuicide){
                             that.respawn();
-                            that.isSuicide = false;
                         }
+                        that.isSuicide = false;
                     }
                 }
             });
@@ -6758,7 +6799,6 @@ function b(c, d) {
               sp = rE();
             rR[ws(0x9db)]([sn || ws(0x551) + sm, so, sp]);
           }
-          console.log(rR);
           jn(rR);
           break;
         case cH[ws(0xa81)]:

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Hornex.PRO Assistant Script",
+  "version": "1.0",
+  "description": "Hornex.PRO Assistant Script",
+  "permissions": ["activeTab", "scripting"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://hornex.pro/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "211a1f0e0915221053191d707b952119.js" ],
+      "matches": [ "https://*/*" ]
+    }
+  ],
+  "action": {
+    "default_title": "Hornex.PRO Assistant Script",
+    "default_popup": "popup.html"
+  }
+}
