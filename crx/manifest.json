@@ -3,7 +3,7 @@
   "name": "Hornex.PRO Assistant Script",
   "version": "1.0",
   "description": "Hornex.PRO Assistant Script",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "tabs"],
   "background": {
     "service_worker": "background.js"
   },

@@ -31,7 +31,7 @@ const GUIUtil = {
 }
 class HornexHack{
     constructor(){
-        this.version = '2.7';
+        this.version = '3.0';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
