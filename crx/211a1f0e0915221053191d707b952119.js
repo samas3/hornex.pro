@@ -24,9 +24,263 @@ const GUIUtil = {
         let div = document.createElement('div');
         div.style.position = 'fixed';
         div.style.padding = '10px';
-        div.style.zIndex = '10000';
+        div.style.zIndex = '1';
         document.body.appendChild(div);
         return div;
+    }
+}
+class ZcxJamesWaveTable{
+    constructor(){
+        this.scriptVersion = '3.0';
+        this.regions = ['as1', 'as2', 'eu1', 'eu2', 'us1', 'us2'];
+        this.tableVisible = true;
+        this.previousServer = '';
+        this.previousZone = '';
+        this.currentServer = '';
+        this.currentZone = '';
+        this.progress = '';
+        this.showUltra = JSON.parse(localStorage.getItem('showUltra')) ?? false;
+        this.showSuper = JSON.parse(localStorage.getItem('showSuper')) ?? true;
+        this.showHyper = JSON.parse(localStorage.getItem('showHyper')) ?? true;
+        this.servers = {
+            'eu1': 'rgb(166, 56, 237)', 'eu2': 'rgb(81, 121, 251)', 'as1': 'rgb(237, 61, 234)', 'us1': 'rgb(219, 130, 41)', 'us2': 'rgb(237, 236, 61)', 'as2': 'rgb(61, 179, 203)'
+        };
+        this.zones = {
+            'Ultra': 'rgb(255, 43, 117)', 'Super': 'rgb(43, 255, 163)', 'Hyper': 'rgb(92, 116, 176)', 'Waveroom': 'rgb(126, 239, 109)'
+        };
+    }
+    start(){
+        document.addEventListener('keydown', (evt) => this.toggleTableVisibility(evt));
+        setInterval(() => this.fetchAndUpdateTable(), 1000);
+        setInterval(() => this.sendPost(), 5000);
+        setInterval(() => this.updateData(), 1000);
+    }
+    xmlhttpRequest(options){
+        var xhr = new XMLHttpRequest();
+        xhr.open(options.method, options.url, true);
+        if (options.headers) { 
+            for (var header in options.headers) { 
+                if (options.headers.hasOwnProperty(header)) { 
+                    xhr.setRequestHeader(header, options.headers[header]); 
+                } 
+            } 
+        } 
+        xhr.onreadystatechange = function () { 
+            if (xhr.readyState === 4) { 
+                if (xhr.status >= 200 && xhr.status < 300) { 
+                    if (options.onload) {
+                         options.onload(xhr); 
+                    } 
+                } else { 
+                    if (options.onerror) {
+                            options.onerror(xhr);
+                    }
+                }
+            }
+        };
+        xhr.send(options.data || null);
+    }
+    createTable(jsonData) {
+        const existingTable = document.getElementById('jsonDataTable');
+        if (existingTable) existingTable.remove();
+        const columnCount = (this.showUltra ? 1 : 0) + (this.showSuper ? 1 : 0) + (this.showHyper ? 1 : 0);
+        if (columnCount === 0) {
+            this.tableVisible = false;
+            return;
+        }
+        const tableWidth = columnCount * 75 + 50;
+        const table = document.createElement('table');
+        table.id = 'jsonDataTable';
+        table.style.cssText = `
+            position: fixed; top: 50%; right: 0; transform: translateY(-50%);
+            border: 1px solid black; background-color: transparent;
+            z-index: 1000; width: ${tableWidth}px; border-collapse: collapse; font-weight: lighter;
+            cursor: pointer;
+        `;
+        table.innerHTML = `
+            <thead>
+                <tr><th style="border: 1px solid black;">&nbsp;</th>
+                    ${this.showUltra ? '<th style="border: 1px solid black;">Ultra</th>' : ''}
+                    ${this.showSuper ? '<th style="border: 1px solid black;">Super</th>' : ''}
+                    ${this.showHyper ? '<th style="border: 1px solid black;">Hyper</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>
+                ${this.regions.map(region => `
+                    <tr>
+                        <td style="border: 1px solid black;">${region}</td>
+                        ${this.showUltra ? this.generateCell(region, 'Ultra', jsonData) : ''}
+                        ${this.showSuper ? this.generateCell(region, 'Super', jsonData) : ''}
+                        ${this.showHyper ? this.generateCell(region, 'Hyper', jsonData) : ''}
+                    </tr>`).join('')}
+            </tbody>`;
+        table.addEventListener('click', () => this.showModal());
+        document.body.appendChild(table);
+        table.style.display = this.tableVisible ? 'table' : 'none';
+    }
+    generateCell(region, type, jsonData) {
+        const key = `${region}_${type}`;
+        const data = jsonData[key] || {};
+        const timeValue = data.time;
+        const progress = data.progress || 'N/A';
+        return `<td style="border: 1px solid black; color: ${timeValue ? 'orange' : 'black'};">${progress}</td>`;
+    }
+    showModal() {
+        if (document.getElementById('modalOverlay')) return;
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'modalOverlay';
+        modalOverlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); z-index: 10000; display: flex; justify-content: center; align-items: center;
+        `;
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white; padding: 20px; border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); text-align: center; max-width: 600px;
+            display: flex; flex-direction: row;
+        `;
+        const infoSidebar = document.createElement('div');
+        infoSidebar.style.cssText = `
+            flex: 1; background: #f0f0f0; padding: 10px; border-right: 1px solid #ddd;
+        `;
+        infoSidebar.innerHTML = `
+            <h3>settings</h3>
+            <label><input type="checkbox" id="showUltra" ${this.showUltra ? 'checked' : ''}> Ultra</label><br>
+            <label><input type="checkbox" id="showSuper" ${this.showSuper ? 'checked' : ''}> Super</label><br>
+            <label><input type="checkbox" id="showHyper" ${this.showHyper ? 'checked' : ''}> Hyper</label><br>
+            <hr>
+            <h3>information</h3>
+            <button id="loadInfo">load script's info</button>
+            <div id="infoContent" style="margin-top: 10px;"></div>
+        `;
+        modalContent.appendChild(infoSidebar);
+        const infoArea = document.createElement('div');
+        infoArea.id = 'infoArea';
+        infoArea.style.cssText = `
+            flex: 2; padding: 20px; display: flex; flex-direction: column;
+        `;
+        infoArea.innerHTML = `
+            <h2>About ZcxJames's hornex wave script</h2>
+            <p>author:ZcxJames</p>
+            <p>version: ${this.scriptVersion}</p>
+            <p>Script homepage: <a href="https://zcxjames.top/zcxjames_hornex_wave_script/" target="_blank">zcxjames.top/zcxjames_hornex_wave_script/</a></p>
+            <button id="closeModalBtn">close</button>
+        `;
+        modalContent.appendChild(infoArea);
+        modalOverlay.appendChild(modalContent);
+        document.body.appendChild(modalOverlay);
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            modalOverlay.remove();
+        });
+        document.getElementById('loadInfo').addEventListener('click', () => {
+            this.loadScriptInfo();
+        });
+        document.getElementById('showUltra').addEventListener('change', (event) => {
+            this.showUltra = event.target.checked;
+            localStorage.setItem('showUltra', JSON.stringify(showUltra));
+            this.fetchAndUpdateTable();
+        });
+        document.getElementById('showSuper').addEventListener('change', (event) => {
+            this.showSuper = event.target.checked;
+            localStorage.setItem('showSuper', JSON.stringify(showSuper));
+            this.fetchAndUpdateTable();
+        });
+        document.getElementById('showHyper').addEventListener('change', (event) => {
+            this.showHyper = event.target.checked;
+            localStorage.setItem('showHyper', JSON.stringify(showHyper));
+            this.fetchAndUpdateTable();
+        });
+    }
+    loadScriptInfo() {
+        document.getElementById('loadInfo').addEventListener('click', () => {
+            this.xmlhttpRequest({
+                method: 'GET',
+                url: 'https://zcxjames.top/script_info.txt',
+                onload: response => {
+                    document.getElementById('infoArea').style.cssText = `
+                        height: 400px;
+                        overflow-y: auto;
+                        padding: 10px;
+                        border: 1px solid #ccc;
+                        background-color: #f9f9f9;
+                        word-wrap: break-word;
+                    `;
+                    document.getElementById('infoArea').innerHTML = `
+                        <h2>about ZcxJames's hornex wave script</h2>
+                        <p>${response.responseText}</p>
+                        <button id="closeModalBtn">close</button>
+                    `;
+                    document.getElementById('closeModalBtn').addEventListener('click', () => {
+                        modalOverlay.remove();
+                    });
+                }
+            });
+        });
+    }
+    fetchAndUpdateTable() {
+        this.xmlhttpRequest({
+            method: 'GET',
+            url: 'https://zcxjames.top/hzzpro.json',
+            onload: response => {
+                this.createTable(JSON.parse(response.responseText));
+            }
+        });
+    }
+    toggleTableVisibility(event) {
+        if (event.key === 'Tab') {
+            event.preventDefault();
+            if (!this.showUltra && !this.showSuper && !this.showHyper) {
+                this.showUltra = false;
+                this.showSuper = true;
+                this.showHyper = true;
+                localStorage.setItem('showUltra', JSON.stringify(this.showUltra));
+                localStorage.setItem('showSuper', JSON.stringify(this.showSuper));
+                localStorage.setItem('showHyper', JSON.stringify(this.showHyper));
+                this.fetchAndUpdateTable();
+                this.tableVisible = true;
+            } else {
+                this.tableVisible = !this.tableVisible;
+            }
+            const table = document.getElementById('jsonDataTable');
+            if (table) table.style.display = this.tableVisible ? 'table' : 'none';
+        }
+    }
+    updateData() {
+        this.currentServer = Object.keys(this.servers).find(server =>
+            document.querySelector(`div.btn.active[style="background-color: ${this.servers[server]};"]`)) || '';
+        this.currentZone = Object.keys(this.zones).find(zone =>
+            document.querySelector(`div.zone-name[stroke="${zone}"]`)) || '';
+        if (document.querySelector('div.zone-name[stroke="Waveroom"]')) this.currentZone = 'waveroom';
+        const waveSpan = document.querySelector('body > div.hud > div.zone > div.progress > span[stroke]');
+        const waveText = waveSpan ? waveSpan.getAttribute('stroke') : '';
+        const waveMatch = waveText.match(/Wave (\d+)/i);
+        this.progress = waveMatch ? 'Wave ' + waveMatch[1] : '0%';
+        document.querySelectorAll('div.bar').forEach(bar => {
+            const matches = bar.style.transform.match(/translate\(calc\(-(\d+(\.\d+)?)% \+ \d+(\.\d+)?em\), 0px\)/);
+            if (matches && matches[1]) {
+                const tempProgress = (100 - parseFloat(matches[1])).toFixed(4);
+                if (parseFloat(tempProgress) > parseFloat(this.progress)) this.progress = tempProgress + '%';
+            }
+        });
+    }
+    sendPost() {
+        if (document.hidden) return;
+        const waveEndingSpan = document.querySelector('span[stroke="Wave Ending..."]');
+        if (waveEndingSpan) return;
+        if (this.currentServer !== this.previousServer || this.currentZone !== this.previousZone) {
+            this.previousServer = this.currentServer;
+            this.previousZone = this.currentZone;
+            return;
+        }
+        const data = { server: this.currentServer, zone: this.currentZone, progress: this.progress };
+        if(this.currentZone && ['Ultra', 'Super', 'Hyper'].includes(this.currentZone)) {
+            this.xmlhttpRequest({
+                method: "POST",
+                url: "https://zcxjames.top:5000",
+                data: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" }
+            });
+        }
     }
 }
 class HornexHack{
@@ -39,10 +293,10 @@ class HornexHack{
             healthDisplay: true, // 血量显示
             disableChatCheck: true, // 是否禁用聊天内容检查
             autoRespawn: true, // 自动重生
-            colorText: false, // 公告彩字
+            //colorText: false, // 公告彩字
             numberNoSuffix: true, // 取消数字单位显示
             lockBuildChange: false, // 禁止更改Build
-            forceLoadScript: false, // 在脚本报错后自动刷新
+            //forceLoadScript: false, // 在脚本报错后自动刷新
             autoClickPlay: true, // 重生后自动点击Play
             allowInvalidCommand: false, // 允许聊天输入无效指令
             shinyAlert: true, // 显示shiny警报
@@ -114,47 +368,7 @@ class HornexHack{
             'changeServer': () => this.changeGUI(),
         };
         this.triggerKeys = Object.keys(this.triggers);
-        // Style
-        let style = document.createElement('style');
-        style.innerHTML = `.p-box{
-            background-color: #fff;
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 0;
-            bottom: 0;
-            margin: auto;
-            box-sizing: border-box;
-            border-radius: 6px;
-            padding: 1em;
-        }
-        .p-close{
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            position: absolute;
-            right: -10px;
-            top: -10px;
-            border: 2px solid #fff;
-            cursor: pointer;
-            background-color: #ff7f7f;
-            text-align: center;
-            line-height: 30px;
-        }
-        .status{
-            text-decoration: none;
-            color: #ff0;
-        }
-        .watch-ad{
-            display: none;
-        }
-        .featured{
-            display: none;
-        }
-        .video{
-            display: none;
-        }`;
-        document.getElementsByTagName('head')[0].appendChild(style);
+        this.table = new ZcxJamesWaveTable();
     }
     // ----- Notice -----
     addChat(text, color='#ff00ff'){
@@ -177,7 +391,8 @@ class HornexHack{
         div.style.textAlign = 'right';
         div.appendChild(span);
         setInterval(() => {
-            span.innerHTML = `<a href="https://github.com/samas3" target="_blank" class="status">${this.status}</a>`
+            //span.innerHTML = `<a href="https://github.com/samas3" target="_blank" class="status">${this.status}</a>`
+            span.innerHTML = this.status;
             if(this.isEnabled('colorText')){
                 //colors = this.moveElement(colors);
                 //span.style.background = `linear-gradient(to right, ${colors.join(',')}, ${colors[0]})`
@@ -305,6 +520,9 @@ class HornexHack{
         this.loadStatus();
         this.setStatus('');
         this.loadModule();
+        if(this.isEnabled('zcxJamesScript')){
+            this.table.start();
+        }
     }
     onload(){
         this.loadModule();
@@ -388,10 +606,9 @@ class HornexHack{
         this.LS_set('saved_builds', JSON.stringify(builds));
         this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
     }
-    viewMob(name){
-        let mobs = document.querySelector('.zone-mobs');
-        let id, rarityNum = this.parseRarity(name);
-        if(rarityNum == 0) name = id;
+    viewMob(mobName){
+        let mobs = document.querySelector('.zone-mobs'), id;
+        let [name, rarityNum] = this.parseRarity(mobName);
         for(const i of this.moblst[rarityNum]){
             if(i['name'].replaceAll(' ', '') == name) id = i;
         }
@@ -517,13 +734,12 @@ class HornexHack{
         let box = GUIUtil.createPopupBox(document.createElement('div'), 300, 150);
         box.appendChild(document.createTextNode('Petals collected: ' + this.petalCount.join('/')))
         box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode('Max Score: ' + maxScore));
+        box.appendChild(document.createTextNode('Score: ' + maxScore));
         box.appendChild(document.createElement('br'));
         box.appendChild(document.createTextNode('Total Kills: ' + totalKills));
         box.appendChild(document.createElement('br'));
         box.appendChild(document.createTextNode('Time Alive: ' + timeAlive));
         if(!quitBtn.classList.contains('red')){
-            //this.addChat('Respawning', '#0ff');
             quitBtn.onclick();
             if(this.isEnabled('autoClickPlay')){
                 this.clickPlay(1);
@@ -541,19 +757,6 @@ class HornexHack{
                 if(this.isEnabled('forceLoadScript')) location.reload();
             }
             let server = this.getServer();
-            let lastUpdated;
-            if(this.isEnabled('zcxJamesScript') && status){
-                lastUpdated = new Date().getTime();
-                let [zone, prog] = status.split(' Wave: ');
-                if(zone && ['Ultra', 'Super', 'Hyper'].includes(zone) && new Date().getTime() - lastUpdated >= 5000){
-                    const data = { server: server.toLowerCase(), zone: zone, progress: prog };
-                    await fetch('http://103.193.151.90:5000', {
-                        method: 'POST',
-                        body: JSON.stringify(data),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                }
-            }
             this.setStatus(`${server}: ${status}`);
             let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){

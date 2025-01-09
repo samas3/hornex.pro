@@ -1,0 +1,38 @@
+.p-box{
+    background-color: #fff;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    box-sizing: border-box;
+    border-radius: 6px;
+    padding: 1em;
+}
+.p-close{
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    position: absolute;
+    right: -10px;
+    top: -10px;
+    border: 2px solid #fff;
+    cursor: pointer;
+    background-color: #ff7f7f;
+    text-align: center;
+    line-height: 30px;
+}
+.status{
+    text-decoration: none;
+    color: #ff0;
+}
+.watch-ad{
+    display: none;
+}
+.featured{
+    display: none;
+}
+.video{
+    display: none;
+}
