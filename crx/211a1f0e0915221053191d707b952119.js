@@ -382,7 +382,7 @@ class HornexHack{
     }
     loadStatus(){
         let div = GUIUtil.createInfoBox();
-        div.style.bottom = '80px';
+        div.style.bottom = '20%';
         div.style.right = '0';
         let span = document.createElement('span');
         span.style.fontSize = '15px';
@@ -506,7 +506,7 @@ class HornexHack{
             return;
         }
         for(const item of this.configKeys){
-            if(!cfg[item]){
+            if(!Object.keys(cfg).includes(item)){
                 this.config[item] = this.default[item];
                 this.setEnabled(item, this.default[item]);
             }else{
@@ -525,7 +525,6 @@ class HornexHack{
         }
     }
     onload(){
-        this.loadModule();
         this.addChat(`${this.name} enabled!`);
         this.addChat('Type /help in chat box to get help');
         this.register();
@@ -5078,15 +5077,7 @@ function b(c, d) {
     }
     var hd = !![],
       he = document[ux(0x546)](ux(0xd5c));
-    fetch(ux(0x165))
-      [ux(0xc15)]((rs) => {
-        const v0 = ux;
-        (he[v0(0x5c6)][v0(0x50f)] = v0(0x5a4)), (hd = ![]);
-      })
-      [ux(0xd5f)]((rs) => {
-        const v1 = ux;
-        he[v1(0x5c6)][v1(0x50f)] = "";
-      });
+          (he[b(0x5c6)][b(0x50f)] = b(0x5a4)), (hd = ![])
     var hf = document[ux(0x546)](ux(0x2ef)),
       hg = Date[ux(0xa4a)]();
     function hh() {
@@ -5193,8 +5184,7 @@ function b(c, d) {
     function hq() {
       const vd = ux,
         rs = hm[ho];
-      (hn[vd(0x5c6)][vd(0x76c)] =
-        vd(0x419) + rs[vd(0x2a6)](vd(0xdd1))[0x1] + vd(0x4e3)),
+      (hn[vd(0x5c6)][vd(0x76c)] = ''),
         (hn[vd(0x8cd)] = function () {
           const ve = vd;
           window[ve(0x258)](rs, ve(0x501)), hp(0x1);
