@@ -220,7 +220,7 @@ class ZcxJamesWaveTable{
     fetchAndUpdateTable() {
         this.xmlhttpRequest({
             method: 'GET',
-            url: 'https://zcxjames.top/hzzpro.json',
+            url: 'https://zcxjames.top/evilcat.json',
             onload: response => {
                 this.createTable(JSON.parse(response.responseText));
             }
@@ -276,7 +276,7 @@ class ZcxJamesWaveTable{
         if(this.currentZone && ['Ultra', 'Super', 'Hyper'].includes(this.currentZone)) {
             this.xmlhttpRequest({
                 method: "POST",
-                url: "https://zcxjames.top:5000",
+                url: "https://zcxjames.top:5001",
                 data: JSON.stringify(data),
                 headers: { "Content-Type": "application/json" }
             });
@@ -337,6 +337,7 @@ class HornexHack{
             '/viewMob <id>': 'view a mob(add it to zone mobs)',
             '/track <id/"stop">': 'track a mob',
             //'/change <server>': 'change server(0=eu1 1=eu2 2=as1 3=us1 4=us2 5=as2, need autoRespawn enabled)',
+            '/dmgTrack': 'toggle damage tracking',
         };
         this.hp = 0;
         this.ingame = false;
@@ -344,6 +345,7 @@ class HornexHack{
             name: "",
             entity: null
         };
+        this.players = {};
         this.tracking = null;
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
         this.isSuicide = false;
@@ -390,7 +392,7 @@ class HornexHack{
         //span.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
         div.style.textAlign = 'right';
         div.appendChild(span);
-        setInterval(() => {
+        this.statusInterval = this.statusInterval || setInterval(() => {
             //span.innerHTML = `<a href="https://github.com/samas3" target="_blank" class="status">${this.status}</a>`
             span.innerHTML = this.status;
             if(this.isEnabled('colorText')){
@@ -523,6 +525,12 @@ class HornexHack{
         if(this.isEnabled('zcxJamesScript')){
             this.table.start();
         }
+        this.testDiv = GUIUtil.createInfoBox();
+        this.testDiv.appendChild(document.createTextNode('test'));
+        this.testDiv.style.right = '50%';
+        this.testDiv.style.top = '50%';
+        this.testDiv.id = 'testDiv';
+        //document.body.appendChild(this.testDiv);
     }
     onload(){
         this.addChat(`${this.name} enabled!`);
@@ -531,6 +539,7 @@ class HornexHack{
         this.loadTrack();
         this.ingame = true;
         $_('.player-list-btn').style.display = '';
+        $_('.censor-cb').checked = false;
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
         this.updatePetal();
         // console.log(this.LS_get('player_id'));
@@ -549,7 +558,7 @@ class HornexHack{
         return `${server.substring(0, 2).toUpperCase()}${server[server.length - 1]}`;
     }
     getColor(r){
-        return this.rarityColor[r['tier']];
+        return this.rarityColor[r.tier];
     }
     convertID(id){
         return id.toString(36);
@@ -576,12 +585,12 @@ class HornexHack{
         }
     }
     getHP(mob) {
-        let tier = mob['tier'], type = mob['type'];
+        let tier = mob.tier, type = mob.type;
         let lst = this.moblst;
         if(mob.isCentiBody) type--;
         if (!lst[tier] || tier >= lst.length) return;
         for (const i of lst[tier]) {
-            if (type == i['type']) return i['health'];
+            if (type == i.type) return i.health;
         }
     }
     onKey(module){
@@ -609,7 +618,7 @@ class HornexHack{
         let mobs = document.querySelector('.zone-mobs'), id;
         let [name, rarityNum] = this.parseRarity(mobName);
         for(const i of this.moblst[rarityNum]){
-            if(i['name'].replaceAll(' ', '') == name) id = i;
+            if(i.name.replaceAll(' ', '') == name) id = i;
         }
         if(!id){
             this.addChat(`Mob not found: ${name}`, '#ff7f50');
@@ -689,6 +698,20 @@ class HornexHack{
     parseRarity(str){
         return str.includes('_') ? str.split('_').map(x => parseInt(x) || x) : [str, 0];
     }
+    damageTrack(){
+        if(!this.trackingDmg){
+            this.trackingDmg = true;
+            this.startTrack = Date.now();
+            this.damageSum = 0;
+            this.addChat('Tracking damage', '#0ff');
+        }
+        else{
+            this.trackingDmg = false;
+            let time = Date.now() - this.startTrack;
+            this.addChat(`Total damage: ${this.damageSum} in ${time / 1000} seconds`, '#0ff');
+            this.addChat(`DPS: ${Math.round(this.damageSum / (time / 1000))}`, '#0ff');
+        }
+    }
     commandMultiArg(func, num, args){
         args = args.split(' ');
         if(args.length != num){
@@ -703,7 +726,7 @@ class HornexHack{
     registerDie(){
         let div = $_('body > div.score-overlay');
         let that = this;
-        this.dieObserver = new this.MutationObserver(function(mutations) {
+        this.dieObserver = this.dieObserver || new this.MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if (mutation.type == 'attributes') {
                     let style = mutation.target.style;
@@ -729,8 +752,9 @@ class HornexHack{
         let maxScore = $_('\span.max-score').getAttribute('stroke');
         let totalKills = $_('\span.total-kills').getAttribute('stroke');
         let timeAlive = $_('\span.time-alive').getAttribute('stroke');
-        this.addChat(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`, '#0ff')
         let box = GUIUtil.createPopupBox(document.createElement('div'), 300, 150);
+        box.appendChild(document.createTextNode(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`));
+        box.appendChild(document.createElement('br'));
         box.appendChild(document.createTextNode('Petals collected: ' + this.petalCount.join('/')))
         box.appendChild(document.createElement('br'));
         box.appendChild(document.createTextNode('Score: ' + maxScore));
@@ -748,7 +772,7 @@ class HornexHack{
         }
     }
     registerMain(){
-        this.mainInterval = setInterval(async () => {
+        this.mainInterval = this.mainInterval || setInterval(async () => {
             let status;
             try{
                 status = this.getWave();
@@ -767,7 +791,7 @@ class HornexHack{
     }
     registerChat(){
         let div = $_('body > div.common > div.chat > div');
-        this.chatObserver = new this.MutationObserver(function(mutations) {
+        this.chatObserver = this.chatObserver || new this.MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if(mutation.type == 'childList'){
                     let chat = mutation.addedNodes[0];
@@ -798,6 +822,7 @@ class HornexHack{
         });
     }
     registerKey(){
+        if(this.keyRegistered) return;
         let chatbox = $_('body > div.common > div.chat > input');
         this.keyFunc = evt => {
             if(document.activeElement.classList == chatbox.classList || !this.ingame) return;
@@ -806,6 +831,7 @@ class HornexHack{
                 if(evt.key == this.bindKeys[item]) this.onKey(item);
             }
         };
+        this.keyRegistered = true;
         window.addEventListener('keyup', this.keyFunc);
     }
     updatePlayer(player){
@@ -813,34 +839,44 @@ class HornexHack{
             this.player.name = player.username;
             this.player.entity = player;
         }
+        if(!Object.keys(this.players).includes(player.username)){
+            this.players[player.username] = player.nick;
+            // 将this.players的每个键和值放入一个列表
+            let list = Object.entries(this.players).filter(x => x[0]);
+            // 将list中每个元素中插入一个字符串
+            list.forEach((item, index) => {
+                list[index] = [item[1], '', item[0]];
+            });
+            this.updatePlayerList(list);
+        }
     }
     updateMob(mob){
-        let tier = mob['tierStr'], type = this.moblst, cur;
-        for(const i of type[mob['tier']]){
-            if(i['type'] == mob['type']) cur = i;
+        let tier = mob.tierStr, type = this.moblst, cur;
+        for(const i of type[mob.tier]){
+            if(i.type == mob.type) cur = i;
         }
         if(!cur) return;
-        let name = cur['uiName'];
-        if(mob['isShiny'] && !mob['shinyFlag'] && this.isEnabled('shinyAlert')){
+        let name = cur.uiName;
+        if(mob.isShiny && !mob.shinyFlag && this.isEnabled('shinyAlert')){
             for(let i = 0; i < 1; i++) this.toastFunc(`A shiny ${tier} ${name} spawned at ${this.getPos(mob).join(', ')}`);
-            mob['shinyFlag'] = 1;
+            mob.shinyFlag = 1;
         }
         if(this.trackingType){
             let minimap = $_('.minimap');
             if(name.replaceAll(' ', '').includes(this.trackingType)){
                 let dot = document.createElement('div');
                 dot.classList = ['minimap-dot'];
-                dot.style.left = `${mob['nx'] / 500 / 60 * 100}%`;
-                dot.style.top = `${mob['ny'] / 500 / 60 * 100}%`;
+                dot.style.left = `${mob.nx / 500 / 60 * 100}%`;
+                dot.style.top = `${mob.ny / 500 / 60 * 100}%`;
                 minimap.appendChild(dot);
-                if(this.trackUI && this.convertID(mob['id']) == this.tracking && !mob['isDead']){
+                if(this.trackUI && this.convertID(mob.id) == this.tracking && !mob.isad){
                     let info = `Tracking ID: ${this.tracking}`;
                     info += `<br>Type: ${tier} ${name}`;
-                    info += `<br>Health: ${Math.round(mob['health'] * 100)}%`;
+                    info += `<br>Health: ${Math.round(mob.health * 100)}%`;
                     info += `<br>Pos: ${this.getPos(mob).join(', ')}`;
                     this.trackUI.innerHTML = info;
                 }else{
-                    this.tracking = this.convertID(mob['id']);
+                    this.tracking = this.convertID(mob.id);
                 }
             }
         }else{
@@ -865,10 +901,10 @@ class HornexHack{
     }
     register(){
         this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
-        if(!this.mainInterval) this.registerMain();
-        if(!this.keyFunc) this.registerKey();
-        if(!this.chatObserver) this.registerChat();
-        if(!this.dieObserver) this.registerDie();
+        this.registerMain();
+        this.registerKey();
+        this.registerChat();
+        this.registerDie();
     }
 }
 var hack = new HornexHack();
@@ -6294,6 +6330,9 @@ function b(c, d) {
       let dmg = Math.round(decDmg * 10000) / 100 + '%';
       if(baseHP && hack.isEnabled('DDenableNumber')) dmg = Math.round(decDmg * baseHP);
       if(isNaN(dmg)) dmg = '';
+      if(hack.trackingDmg){
+          hack.damageSum += parseInt(dmg);
+      }
       let rC;
       const rD = rB === void 0x0;
       !rD && (rC = Math[w2(0xa5e)]((rA[w2(0x890)] - rB) * 0x64) || 0x1),
@@ -6466,8 +6505,9 @@ function b(c, d) {
         k9(rD[wb(0x476)][0x0], jl[wb(0x7f0)] ? wb(0x937) : rD[wb(0xc11)]);
       }
     }
+    hack.updatePlayerList = jn;
     function jn(rC) {
-      const wc = ux;
+      /*const wc = ux;
       (ji[wc(0x5c6)][wc(0x50f)] = ""), (jj[wc(0x90b)] = wc(0x63c));
       const rD = rC[wc(0xc2f)];
       jk = [];
@@ -6475,7 +6515,16 @@ function b(c, d) {
         const rF = rC[rE];
         jj[wc(0xcee)](nR(wc(0x6b9) + (rE + 0x1) + wc(0xa3d))), jo(rF);
       }
-      m3[wc(0x519)][wc(0x695)]();
+      m3[wc(0x519)][wc(0x695)]();*/
+    ji.style.display = "";
+    jj.innerHTML = "<div><span stroke=\"#\"></span></div>\n\t\t<div><span stroke=\"Nickname\"></span></div>\n\t\t<div><span stroke=\"IP\"></span></div>\n\t\t<div><span stroke=\"Account ID\"></span></div>";
+    const rD = rC.length;
+    jk = [];
+    for (let rE = 0x0; rE < rD; rE++) {
+      const rF = rC[rE];
+      jj.appendChild(nR("<div><span stroke=\"" + (rE + 0x1) + ".\"></span></div>"));
+      jo(rF);
+    }
     }
     function jo(rC) {
       const wd = ux;
@@ -12833,7 +12882,7 @@ function b(c, d) {
         hack.updateMob(mob);
         const health = genCanvas(
           rJ,
-          `${Math.round(mob['health'] * hack.getHP(mob))} (${Math.round(mob['health'] * 100)}%)`,
+          `${Math.round(mob.health * hack.getHP(mob))} (${Math.round(mob.health * 100)}%)`,
           30,
           hack.getColor(mob),
           3,
@@ -14191,6 +14240,8 @@ function b(c, d) {
                             hack.commandMultiArg('viewMob', 2, inputChat);
                         }else if(inputChat.startsWith('/track')){
                             hack.commandMultiArg('onTrack', 2, inputChat);
+                        }else if(inputChat.startsWith('/dmgTrack')){
+                            hack.damageTrack();
                         }else if(!hack.isEnabled('allowInvalidCommand') && hack.notCommand(inputChat.split(' ')[0])){
                             hack.addError('Invalid command!');
                         }else
