@@ -9,6 +9,9 @@ const observer = new MutationObserver((mutations) => {
                 if(node.style && node.style.backgroundImage.includes('ytimg')) {
                     node.style.backgroundImage = '';
                 }
+                if(node.classList && (node.classList.contains('collected-petals') || node.classList.contains('collected-rarities') || node.classList.contains('collected'))) {
+                    node.remove();
+                }
             });
         }
     });

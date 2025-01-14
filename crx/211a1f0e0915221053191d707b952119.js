@@ -285,7 +285,7 @@ class ZcxJamesWaveTable{
 }
 class HornexHack{
     constructor(){
-        this.version = '3.0';
+        //this.version = '3.0';
         this.config = {};
         this.default = {
             damageDisplay: true, // 伤害显示修改
@@ -301,6 +301,7 @@ class HornexHack{
             allowInvalidCommand: false, // 允许聊天输入无效指令
             shinyAlert: true, // 显示shiny警报
             showRealTimePickup: true, // 显示实时拾取掉落物
+            RPShowNumberOnly: false, // 只显示掉落物数量
             zcxJamesScript: true, // ZcxJames脚本适配
         };
         this.configKeys = Object.keys(this.default);
@@ -321,7 +322,7 @@ class HornexHack{
             '#5c74b0'
         ];
         this.status = '';
-        this.name = `Hornex Hack v${this.version} by samas3`;
+        this.name = `Hornex Hack by samas3`;
         this.commands = {
             '/profile <user>': '<internal> show user\'s profile',
             '/dlMob <mob>': '<internal> downloas an image of a specific mob',
@@ -371,6 +372,8 @@ class HornexHack{
         };
         this.triggerKeys = Object.keys(this.triggers);
         this.table = new ZcxJamesWaveTable();
+        this.chatHistory = [];
+        this.chatHistoryIndex = 0;
     }
     // ----- Notice -----
     addChat(text, color='#ff00ff'){
@@ -525,12 +528,7 @@ class HornexHack{
         if(this.isEnabled('zcxJamesScript')){
             this.table.start();
         }
-        this.testDiv = GUIUtil.createInfoBox();
-        this.testDiv.appendChild(document.createTextNode('test'));
-        this.testDiv.style.right = '50%';
-        this.testDiv.style.top = '50%';
-        this.testDiv.id = 'testDiv';
-        //document.body.appendChild(this.testDiv);
+        if(this.isEnabled('showRealTimePickup') && !this.isEnabled('RPShowNumberOnly')) this.preparePetalDiv();
     }
     onload(){
         this.addChat(`${this.name} enabled!`);
@@ -541,7 +539,6 @@ class HornexHack{
         $_('.player-list-btn').style.display = '';
         $_('.censor-cb').checked = false;
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
-        this.updatePetal();
         // console.log(this.LS_get('player_id'));
     }
     notCommand(cmd){
@@ -724,7 +721,7 @@ class HornexHack{
     }
     // ----- Event -----
     registerDie(){
-        let div = $_('body > div.score-overlay');
+        let div = $_('.score-overlay');
         let that = this;
         this.dieObserver = this.dieObserver || new this.MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
@@ -732,7 +729,6 @@ class HornexHack{
                     let style = mutation.target.style;
                     if(style.display != 'none'){
                         that.ingame = false;
-                        that.updatePetal();
                         if(that.isEnabled('autoRespawn') && !that.isSuicide){
                             that.respawn();
                         }
@@ -755,7 +751,7 @@ class HornexHack{
         let box = GUIUtil.createPopupBox(document.createElement('div'), 300, 150);
         box.appendChild(document.createTextNode(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`));
         box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode('Petals collected: ' + this.petalCount.join('/')))
+        box.appendChild(document.createTextNode('Petals: ' + this.petalCount.join('/')))
         box.appendChild(document.createElement('br'));
         box.appendChild(document.createTextNode('Score: ' + maxScore));
         box.appendChild(document.createElement('br'));
@@ -787,6 +783,7 @@ class HornexHack{
             }
             if(!this.ingame) this.trackUI.style.display = 'none';
             this.clearDots();
+            this.updatePetal();
         }, 1000);
     }
     registerChat(){
@@ -824,15 +821,33 @@ class HornexHack{
     registerKey(){
         if(this.keyRegistered) return;
         let chatbox = $_('body > div.common > div.chat > input');
-        this.keyFunc = evt => {
-            if(document.activeElement.classList == chatbox.classList || !this.ingame) return;
+        chatbox.onfocus = () => {
+            this.chatHistoryIndex = this.chatHistory.length;
+        }
+        let keyFunc = evt => {
+            if(document.activeElement.classList == chatbox.classList){
+                if(evt.key == 'ArrowUp'){
+                    if(this.chatHistoryIndex > 0){
+                        this.chatHistoryIndex--;
+                        console.log(this.chatHistoryIndex);
+                        chatbox.value = this.chatHistory[this.chatHistoryIndex];
+                    }
+                }else if(evt.key == 'ArrowDown'){
+                    if(this.chatHistoryIndex < this.chatHistory.length - 1){
+                        this.chatHistoryIndex++;
+                        chatbox.value = this.chatHistory[this.chatHistoryIndex];
+                    }
+                }
+                return;
+            }
+            if(!this.ingame) return;
             for(let i = 0; i < Object.keys(this.bindKeys).length; i++){
                 let item = Object.keys(this.bindKeys)[i];
                 if(evt.key == this.bindKeys[item]) this.onKey(item);
             }
         };
         this.keyRegistered = true;
-        window.addEventListener('keyup', this.keyFunc);
+        window.addEventListener('keyup', keyFunc);
     }
     updatePlayer(player){
         if(player.id == -1){
@@ -841,9 +856,7 @@ class HornexHack{
         }
         if(!Object.keys(this.players).includes(player.username)){
             this.players[player.username] = player.nick;
-            // 将this.players的每个键和值放入一个列表
-            let list = Object.entries(this.players).filter(x => x[0]);
-            // 将list中每个元素中插入一个字符串
+            let list = Object.entries(this.players).filter(x => x[0] && x[1]);
             list.forEach((item, index) => {
                 list[index] = [item[1], '', item[0]];
             });
@@ -889,7 +902,6 @@ class HornexHack{
         petal.picked = true;
         let [name, rarity] = this.parseRarity(petal.petal.name);
         this.petalCount[rarity]++;
-        this.updatePetal();
     }
     updatePetal(){
         let info = 'Petals: ';
@@ -898,6 +910,23 @@ class HornexHack{
         }
         info = info.slice(0, -1);
         if(this.isEnabled('showRealTimePickup')) this.statusAbove = info;
+        else this.statusAbove = '';
+        if(!this.isEnabled('RPShowNumberOnly')) this.updatePetals();
+    }
+    preparePetalDiv(){
+        this.petalDiv = document.createElement('div');
+        this.petalDiv.classList = ['collected']
+        this.petalDiv.style.right = '0px';
+        this.petalDiv.style.top = '85%';
+        this.petalDiv.style.zIndex = '1000';
+        this.petalDiv.style.position = 'fixed';
+        this.collectedRarities = document.createElement('div');
+        this.collectedRarities.classList = ['collected-rarities'];
+        this.petalDiv.appendChild(this.collectedRarities);
+        this.collectedPetals = document.createElement('div');
+        this.collectedPetals.classList = ['collected-petals'];
+        this.petalDiv.appendChild(this.collectedPetals);
+        document.body.appendChild(this.petalDiv);
     }
     register(){
         this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
@@ -5049,6 +5078,11 @@ function b(c, d) {
       h2,
     ];
     console[ux(0x8b7)](ux(0xcb1));
+    hack.chatFunc = hJ;
+    hack.numFunc = iK;
+    hack.updatePlayerList = jn;
+    hack.updatePetals = oE;
+    hack.preload();
     var h4 = Date[ux(0xa4a)]() < 0x18e9c4b6482,
       h5 = Math[ux(0xa6f)](Math[ux(0xe0d)]() * 0xa);
     function h6(rs) {
@@ -5472,9 +5506,6 @@ function b(c, d) {
     function hY() {
       const vz = ux;
       console[vz(0x8b7)](vz(0x900)), ig();
-      hack.chatFunc = hJ;
-      hack.numFunc = iK;
-      hack.preload();
     }
     var hZ = document[ux(0x546)](ux(0x9a9));
     function i0() {
@@ -6505,7 +6536,6 @@ function b(c, d) {
         k9(rD[wb(0x476)][0x0], jl[wb(0x7f0)] ? wb(0x937) : rD[wb(0xc11)]);
       }
     }
-    hack.updatePlayerList = jn;
     function jn(rC) {
       /*const wc = ux;
       (ji[wc(0x5c6)][wc(0x50f)] = ""), (jj[wc(0x90b)] = wc(0x63c));
@@ -14220,6 +14250,7 @@ function b(c, d) {
                     if (rN[Ab(0xdb3)](Ab(0x8e1))) nr(qy, Ab(0x570));
                     else {
                         let inputChat = rN;
+                        hack.chatHistory.push(inputChat);
                         if(inputChat.startsWith('/toggle')){
                             hack.commandMultiArg('toggle', 2, inputChat);
                         }else if(inputChat.startsWith('/list')){
@@ -15016,6 +15047,7 @@ function b(c, d) {
         })[AT(0xa40)](([s0, s1]) => {
           const AU = AT,
             s2 = og(s0);
+            s2.classList.remove('spin');
           jZ(s2), p6(s2[AU(0xa4f)], s1), oB[AU(0xcee)](s2);
         }),
         oF(oC, rV);
