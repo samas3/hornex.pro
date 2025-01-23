@@ -121,7 +121,7 @@ class ZcxJamesWaveTable{
     generateCell(region, type, jsonData) {
         const key = `${region}_${type}`;
         const data = jsonData[key] || {};
-        const timeValue = data.time;
+        const timeValue = data.status;
         const progress = data.progress || 'N/A';
         return `<td style="border: 1px solid black; color: ${timeValue ? 'orange' : 'black'};">${progress}</td>`;
     }
@@ -782,8 +782,10 @@ class HornexHack{
                 btn[i].style.display = this.isEnabled('lockBuildChange') ? 'none' : '';
             }
             if(!this.ingame) this.trackUI.style.display = 'none';
+            if(this.ingame) this.updatePetal();
             this.clearDots();
-            this.updatePetal();
+            if(this.isEnabled('showRealTimePickup')) this.petalDiv.style.display = '';
+            else this.petalDiv.style.display = 'none';
         }, 1000);
     }
     registerChat(){
