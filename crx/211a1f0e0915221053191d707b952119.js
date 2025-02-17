@@ -46,7 +46,7 @@ class ZcxJamesWaveTable{
             'eu1': 'rgb(166, 56, 237)', 'eu2': 'rgb(81, 121, 251)', 'as1': 'rgb(237, 61, 234)', 'us1': 'rgb(219, 130, 41)', 'us2': 'rgb(237, 236, 61)', 'as2': 'rgb(61, 179, 203)'
         };
         this.zones = {
-            'Ultra': 'rgb(255, 43, 117)', 'Super': 'rgb(43, 255, 163)', 'Hyper': 'rgb(92, 116, 176)', 'Waveroom': 'rgb(126, 239, 109)'
+            Ultra: 'rgb(255, 43, 117)', Super: 'rgb(43, 255, 163)', Hyper: 'rgb(92, 116, 176)', Waveroom: 'rgb(126, 239, 109)'
         };
     }
     start(){
@@ -83,7 +83,7 @@ class ZcxJamesWaveTable{
     createTable(jsonData) {
         const existingTable = document.getElementById('jsonDataTable');
         if (existingTable) existingTable.remove();
-        const columnCount = (this.showUltra ? 1 : 0) + (this.showSuper ? 1 : 0) + (this.showHyper ? 1 : 0);
+        const columnCount = this.showUltra + this.showSuper + this.showHyper;
         if (columnCount === 0) {
             this.tableVisible = false;
             return;
@@ -325,8 +325,9 @@ class HornexHack{
         this.name = `Hornex Hack by samas3`;
         this.commands = {
             '/profile <user>': '<internal> show user\'s profile',
-            '/dlMob <mob>': '<internal> downloas an image of a specific mob',
+            '/dlMob <mob>': '<internal> download an image of a specific mob',
             '/dlPetal <petal>': '<internal> download an image of a specific petal',
+            '/dlSprite': '<internal> download all images used in the game',
             '/toggle <module>': 'toggle a specific module',
             '/list': 'lists all the modules and configs',
             '/help': 'show this help',
@@ -374,6 +375,8 @@ class HornexHack{
         this.table = new ZcxJamesWaveTable();
         this.chatHistory = [];
         this.chatHistoryIndex = 0;
+        this.listeners = {};
+        this.intervals = {};
     }
     // ----- Notice -----
     addChat(text, color='#ff00ff'){
@@ -395,7 +398,7 @@ class HornexHack{
         //span.style.background = `linear-gradient(to right, ${colors.join(',')},${colors[0]})`
         div.style.textAlign = 'right';
         div.appendChild(span);
-        this.statusInterval = this.statusInterval || setInterval(() => {
+        this.intervals['status'] = this.intervals['status'] || setInterval(() => {
             //span.innerHTML = `<a href="https://github.com/samas3" target="_blank" class="status">${this.status}</a>`
             span.innerHTML = this.status;
             if(this.isEnabled('colorText')){
@@ -421,6 +424,12 @@ class HornexHack{
         div.style.display = 'none';
         div.innerHTML = "Not Tracking";
         this.trackUI = div;
+    }
+    modifyPlayerList(){
+        $_('.player-list-btn').style.display = '';
+        $_('.censor-cb').checked = false;
+        $_('body > div.common > div.dialog.player-list > label > span').setAttribute('stroke', 'Enable Copy');
+        $_('body > div.common > div.dialog.player-list > div.player-list-info').setAttribute('stroke', 'Checked=Copy, Unchecked=View Profile')
     }
     // ----- Module -----
     hasModule(module){
@@ -528,7 +537,7 @@ class HornexHack{
         if(this.isEnabled('zcxJamesScript')){
             this.table.start();
         }
-        if(this.isEnabled('showRealTimePickup') && !this.isEnabled('RPShowNumberOnly')) this.preparePetalDiv();
+        this.preparePetalDiv();
     }
     onload(){
         this.addChat(`${this.name} enabled!`);
@@ -536,9 +545,9 @@ class HornexHack{
         this.register();
         this.loadTrack();
         this.ingame = true;
-        $_('.player-list-btn').style.display = '';
-        $_('.censor-cb').checked = false;
+        this.modifyPlayerList();
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
+        if(this.isEnabled('showRealTimePickup') && !this.isEnabled('RPShowNumberOnly')) this.petalDiv.style.display = '';
         // console.log(this.LS_get('player_id'));
     }
     notCommand(cmd){
@@ -607,7 +616,7 @@ class HornexHack{
     }
     viewPetal(id){
         let builds = this.LS_get('saved_builds');
-        builds['49'] = [id]
+        builds['49'] = [id];
         this.LS_set('saved_builds', JSON.stringify(builds));
         this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
     }
@@ -711,19 +720,22 @@ class HornexHack{
     }
     commandMultiArg(func, num, args){
         args = args.split(' ');
-        if(args.length != num){
-            this.addError(`Args num not correct (!=${num})`);
+        let res = args.slice(0, num);
+        if(args.length > num) res[num - 1] += ' ' + args.slice(num).join(' ');
+        res = res.slice(1);
+        if(res.length < num - 1){
+            this.addError(`Args num not correct (<${num - 1})`);
             return true;
         }else{
-            this[func](...args.slice(1));
+            this[func](...res);
             return false;
         }
     }
     // ----- Event -----
-    registerDie(){
+    registerDeath(){
         let div = $_('.score-overlay');
         let that = this;
-        this.dieObserver = this.dieObserver || new this.MutationObserver(function(mutations) {
+        this.listeners['death'] = this.listeners['death'] || new this.MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if (mutation.type == 'attributes') {
                     let style = mutation.target.style;
@@ -737,7 +749,7 @@ class HornexHack{
                 }
             });
         });
-        this.dieObserver.observe(div, {
+        this.listeners['death'].observe(div, {
             attributes: true,
             attributeFilter: ['style']
         });
@@ -768,7 +780,7 @@ class HornexHack{
         }
     }
     registerMain(){
-        this.mainInterval = this.mainInterval || setInterval(async () => {
+        this.intervals['main'] = this.intervals['main'] || setInterval(async () => {
             let status;
             try{
                 status = this.getWave();
@@ -790,7 +802,7 @@ class HornexHack{
     }
     registerChat(){
         let div = $_('body > div.common > div.chat > div');
-        this.chatObserver = this.chatObserver || new this.MutationObserver(function(mutations) {
+        this.listeners['chat'] = this.listeners['chat'] || new this.MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if(mutation.type == 'childList'){
                     let chat = mutation.addedNodes[0];
@@ -816,22 +828,21 @@ class HornexHack{
                 }
             });
         });
-        this.chatObserver.observe(div, {
+        this.listeners['chat'].observe(div, {
             childList: true
         });
     }
     registerKey(){
-        if(this.keyRegistered) return;
+        if(this.listeners['key']) return;
         let chatbox = $_('body > div.common > div.chat > input');
         chatbox.onfocus = () => {
             this.chatHistoryIndex = this.chatHistory.length;
         }
-        let keyFunc = evt => {
+        this.listeners['key'] = evt => {
             if(document.activeElement.classList == chatbox.classList){
                 if(evt.key == 'ArrowUp'){
                     if(this.chatHistoryIndex > 0){
                         this.chatHistoryIndex--;
-                        console.log(this.chatHistoryIndex);
                         chatbox.value = this.chatHistory[this.chatHistoryIndex];
                     }
                 }else if(evt.key == 'ArrowDown'){
@@ -848,8 +859,7 @@ class HornexHack{
                 if(evt.key == this.bindKeys[item]) this.onKey(item);
             }
         };
-        this.keyRegistered = true;
-        window.addEventListener('keyup', keyFunc);
+        window.addEventListener('keyup', this.listeners['key']);
     }
     updatePlayer(player){
         if(player.id == -1){
@@ -858,9 +868,9 @@ class HornexHack{
         }
         if(!Object.keys(this.players).includes(player.username)){
             this.players[player.username] = player.nick;
-            let list = Object.entries(this.players).filter(x => x[0] && x[1]);
+            let list = Object.entries(this.players).filter(x => x[0] != 'undefined');
             list.forEach((item, index) => {
-                list[index] = [item[1], '', item[0]];
+                list[index] = [item[1] || '<nameless>', '', item[0]];
             });
             this.updatePlayerList(list);
         }
@@ -917,17 +927,132 @@ class HornexHack{
     }
     preparePetalDiv(){
         this.petalDiv = document.createElement('div');
-        this.petalDiv.classList = ['collected']
-        this.petalDiv.style.right = '0px';
-        this.petalDiv.style.top = '85%';
-        this.petalDiv.style.zIndex = '1000';
+        this.petalDiv.classList = ['collected'];
         this.petalDiv.style.position = 'fixed';
+        this.petalDiv.style.bottom = '1%';
+        this.petalDiv.style.right = '1%';
+        this.petalDiv.style.padding = '10px';
+        this.petalDiv.style.backgroundColor = '#333';
+        this.petalDiv.style.color = 'white';
+        this.petalDiv.style.borderRadius = '8px';
+        this.petalDiv.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+        this.petalDiv.style.zIndex = '1000';
+        let minWidth = 200, minHeight = 150;
+        this.petalDiv.style.width = '200px';
+        this.petalDiv.style.height = '150px';
+        this.petalDiv.style.minWidth = minWidth + 'px';
+        this.petalDiv.style.minHeight = minHeight + 'px';
+        this.petalDiv.style.border = '2px solid rgba(255, 255, 255, 0.2)';
+        this.petalDiv.style.display = 'none';
         this.collectedRarities = document.createElement('div');
         this.collectedRarities.classList = ['collected-rarities'];
+        this.collectedRarities.style.fontSize = '15px';
         this.petalDiv.appendChild(this.collectedRarities);
         this.collectedPetals = document.createElement('div');
         this.collectedPetals.classList = ['collected-petals'];
+        this.collectedPetals.style.overflowY = 'auto';
+        this.collectedPetals.style.maxHeight = '400px';
         this.petalDiv.appendChild(this.collectedPetals);
+        let isDragging = false;
+        let isResizing = false;
+        let resizeDirection = "";
+        let offsetX = 0, offsetY = 0;
+        let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight, resizeStartLeft, resizeStartTop;
+        let that = this;
+        this.petalDiv.addEventListener("mousedown", function (e) {
+            const rect = that.petalDiv.getBoundingClientRect();
+            if (e.clientX > rect.right - 10 && e.clientY > rect.bottom - 10) {
+                isResizing = true;
+                resizeDirection = "right-bottom";
+                resizeStartX = e.clientX;
+                resizeStartY = e.clientY;
+                resizeStartWidth = parseInt(that.petalDiv.style.width);
+                resizeStartHeight = parseInt(that.petalDiv.style.height);
+                resizeStartLeft = parseInt(that.petalDiv.style.left);
+                resizeStartTop = parseInt(that.petalDiv.style.top);
+                that.petalDiv.style.cursor = "se-resize";
+            } else if (e.clientX > rect.right - 10) {
+                isResizing = true;
+                resizeDirection = "right";
+                resizeStartX = e.clientX;
+                resizeStartWidth = parseInt(that.petalDiv.style.width);
+                resizeStartLeft = parseInt(that.petalDiv.style.left);
+                that.petalDiv.style.cursor = "e-resize";
+            } else if (e.clientY > rect.bottom - 10) {
+                isResizing = true;
+                resizeDirection = "bottom";
+                resizeStartY = e.clientY;
+                resizeStartHeight = parseInt(that.petalDiv.style.height);
+                resizeStartTop = parseInt(that.petalDiv.style.top);
+                that.petalDiv.style.cursor = "s-resize";
+            } else if (e.clientX < rect.left + 10) {
+                isResizing = true;
+                resizeDirection = "left";
+                resizeStartX = e.clientX;
+                resizeStartWidth = parseInt(that.petalDiv.style.width);
+                resizeStartLeft = parseInt(that.petalDiv.style.left);
+                that.petalDiv.style.cursor = "w-resize";
+            } else if (e.clientY < rect.top + 10) {
+                isResizing = true;
+                resizeDirection = "top";
+                resizeStartY = e.clientY;
+                resizeStartHeight = parseInt(that.petalDiv.style.height);
+                resizeStartTop = parseInt(that.petalDiv.style.top);
+                that.petalDiv.style.cursor = "n-resize";
+            } else {
+                isDragging = true;
+                offsetX = e.clientX - that.petalDiv.offsetLeft;
+                offsetY = e.clientY - that.petalDiv.offsetTop;
+                that.petalDiv.style.cursor = "grabbing";
+            }
+        });
+        document.addEventListener("mousemove", function (e) {
+            if (isDragging) {
+                that.petalDiv.style.left = e.clientX - offsetX + "px";
+                that.petalDiv.style.top = e.clientY - offsetY + "px";
+            } else if (isResizing) {
+                const deltaX = e.clientX - resizeStartX;
+                const deltaY = e.clientY - resizeStartY;
+                if (resizeDirection.includes("right")) {
+                    const newWidth = resizeStartWidth + deltaX;
+                    that.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
+                }
+                if (resizeDirection.includes("bottom")) {
+                    const newHeight = resizeStartHeight + deltaY;
+                    that.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
+                }
+                if (resizeDirection.includes("left")) {
+                    const newWidth = resizeStartWidth - deltaX;
+                    that.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
+                    that.petalDiv.style.left = resizeStartLeft + deltaX + "px";
+                }
+                if (resizeDirection.includes("top")) {
+                    const newHeight = resizeStartHeight - deltaY;
+                    that.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
+                    that.petalDiv.style.top = resizeStartTop + deltaY + "px";
+                }
+                const currentHeight = parseInt(that.petalDiv.style.height);
+                that.collectedPetals.style.maxHeight = currentHeight + "px";
+            }
+        });
+        document.addEventListener("mouseup", function () {
+            isDragging = false;
+            isResizing = false;
+            that.petalDiv.style.cursor = "move";
+        });
+        this.petalDiv.addEventListener("mousemove", function (e) {
+            const rect = that.petalDiv.getBoundingClientRect();
+            const isAtRightEdge = e.clientX > rect.right - 10 && e.clientX < rect.right + 10;
+            const isAtBottomEdge = e.clientY > rect.bottom - 10 && e.clientY < rect.bottom + 10;
+            const isAtLeftEdge = e.clientX > rect.left - 10 && e.clientX < rect.left + 10;
+            const isAtTopEdge = e.clientY > rect.top - 10 && e.clientY < rect.top + 10;
+            if (isAtRightEdge && isAtBottomEdge) that.petalDiv.style.cursor = "se-resize";
+            else if (isAtRightEdge) that.petalDiv.style.cursor = "e-resize";
+            else if (isAtBottomEdge) that.petalDiv.style.cursor = "s-resize";
+            else if (isAtLeftEdge) that.petalDiv.style.cursor = "w-resize";
+            else if (isAtTopEdge) that.petalDiv.style.cursor = "n-resize";
+            else that.petalDiv.style.cursor = "move";
+        });
         document.body.appendChild(this.petalDiv);
     }
     register(){
@@ -935,7 +1060,7 @@ class HornexHack{
         this.registerMain();
         this.registerKey();
         this.registerChat();
-        this.registerDie();
+        this.registerDeath();
     }
 }
 var hack = new HornexHack();
@@ -5084,6 +5209,7 @@ function b(c, d) {
     hack.numFunc = iK;
     hack.updatePlayerList = jn;
     hack.updatePetals = oE;
+    hack.viewProfile = mA;
     hack.preload();
     var h4 = Date[ux(0xa4a)]() < 0x18e9c4b6482,
       h5 = Math[ux(0xa6f)](Math[ux(0xe0d)]() * 0xa);
@@ -6529,7 +6655,7 @@ function b(c, d) {
       jk = [],
       jl = document[ux(0x546)](ux(0x53e));
     jl[ux(0x23d)] = function () {
-      jm();
+      //jm();
     };
     function jm() {
       const wb = ux;
@@ -6549,7 +6675,7 @@ function b(c, d) {
       }
       m3[wc(0x519)][wc(0x695)]();*/
     ji.style.display = "";
-    jj.innerHTML = "<div><span stroke=\"#\"></span></div>\n\t\t<div><span stroke=\"Nickname\"></span></div>\n\t\t<div><span stroke=\"IP\"></span></div>\n\t\t<div><span stroke=\"Account ID\"></span></div>";
+    jj.innerHTML = "<div><span stroke=\"#\"></span></div>\n\t\t<div><span stroke=\"Nickname\"></span></div>\n\t\t<div><span stroke=\"别点这列会被踢\"></span></div>\n\t\t<div><span stroke=\"Account ID\"></span></div>";
     const rD = rC.length;
     jk = [];
     for (let rE = 0x0; rE < rD; rE++) {
@@ -6566,11 +6692,11 @@ function b(c, d) {
         (rF[wd(0xc11)] = rE),
           rD > 0x0 && jk[wd(0x9db)](rF),
           (rF[wd(0x8cd)] = function () {
-            jq(rE);
+            if(jl.checked) jq(rE);
+            hack.viewProfile(rE);
           }),
           jj[wd(0xcee)](rF);
       }
-      jm();
     }
     function jp(rC) {
       const we = ux;
@@ -14730,7 +14856,7 @@ function b(c, d) {
             (iR[rV[Au(0x13d)]] = rV);
         }
         rS >= iO
-          ? (rT[Au(0xcee)](nR(Au(0x815) + ((rS - iO + 0x1) % 0xa) + Au(0x41f))),
+          ? (rT[Au(0xcee)](nR(Au(0x815) + (rS - iO >= 10 ? 'Shift+' : '') + ((rS - iO + 0x1) % 0xa) + Au(0x41f))),
             nB[Au(0xcee)](rT))
           : nA[Au(0xcee)](rT);
       }
