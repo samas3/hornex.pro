@@ -1,23 +1,19 @@
-const $ = (i) => document.getElementById(i);
+const $ = (i) => document.getElementById.bind(document)(i);
 const $_ = (i) => document.querySelector.bind(document)(i);
 const $$_ = (i) => document.querySelectorAll.bind(document)(i);
 const GUIUtil = {
-    createPopupBox: function(elem, w, h, bg='#fff'){
+    createPopupBox: function(elem, w, h){
         let box = document.createElement('div');
         box.className = 'p-box';
-        box.style.backgroundColor = bg;
         box.style.width = w + 'px';
         box.style.height = h + 'px';
-        box.appendChild(elem);
         let close = document.createElement('div');
         close.className = 'p-close';
-        close.innerHTML = 'X';
-        close.onclick = function(){
-            document.body.removeChild(box);
-        };
+        close.innerHTML = '×';
+        close.onclick = () => document.body.removeChild(box);
         box.appendChild(close);
+        box.appendChild(elem);
         document.body.appendChild(box);
-        box.close = () => document.body.removeChild(box);
         return box;
     },
     createInfoBox: function(){
@@ -39,182 +35,191 @@ class ZcxJamesWaveTable{
         this.currentServer = '';
         this.currentZone = '';
         this.progress = '';
-        this.showUltra = JSON.parse(localStorage.getItem('showUltra')) ?? false;
-        this.showSuper = JSON.parse(localStorage.getItem('showSuper')) ?? true;
-        this.showHyper = JSON.parse(localStorage.getItem('showHyper')) ?? true;
+        this.showZone = [JSON.parse(localStorage.getItem('showUltra')) ?? false,
+            JSON.parse(localStorage.getItem('showSuper')) ?? true,
+            JSON.parse(localStorage.getItem('showHyper')) ?? true]
         this.servers = {
             'eu1': 'rgb(166, 56, 237)', 'eu2': 'rgb(81, 121, 251)', 'as1': 'rgb(237, 61, 234)', 'us1': 'rgb(219, 130, 41)', 'us2': 'rgb(237, 236, 61)', 'as2': 'rgb(61, 179, 203)'
         };
         this.zones = {
             Ultra: 'rgb(255, 43, 117)', Super: 'rgb(43, 255, 163)', Hyper: 'rgb(92, 116, 176)', Waveroom: 'rgb(126, 239, 109)'
         };
+        this.modalOverlay = null;
+        this.table = null;
     }
-    start(){
-        document.addEventListener('keydown', (evt) => this.toggleTableVisibility(evt));
-        setInterval(() => this.fetchAndUpdateTable(), 1000);
-        setInterval(() => this.sendPost(), 5000);
-        setInterval(() => this.updateData(), 1000);
-    }
-    xmlhttpRequest(options){
-        var xhr = new XMLHttpRequest();
-        xhr.open(options.method, options.url, true);
-        if (options.headers) { 
-            for (var header in options.headers) { 
-                if (options.headers.hasOwnProperty(header)) { 
-                    xhr.setRequestHeader(header, options.headers[header]); 
-                } 
-            } 
-        } 
-        xhr.onreadystatechange = function () { 
-            if (xhr.readyState === 4) { 
-                if (xhr.status >= 200 && xhr.status < 300) { 
-                    if (options.onload) {
-                         options.onload(xhr); 
-                    } 
-                } else { 
-                    if (options.onerror) {
-                            options.onerror(xhr);
-                    }
-                }
-            }
-        };
-        xhr.send(options.data || null);
-    }
-    createTable(jsonData) {
-        const existingTable = document.getElementById('jsonDataTable');
-        if (existingTable) existingTable.remove();
-        const columnCount = this.showUltra + this.showSuper + this.showHyper;
-        if (columnCount === 0) {
-            this.tableVisible = false;
-            return;
-        }
-        const tableWidth = columnCount * 75 + 50;
-        const table = document.createElement('table');
-        table.id = 'jsonDataTable';
-        table.style.cssText = `
-            position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-            border: 1px solid black; background-color: transparent;
-            z-index: 1000; width: ${tableWidth}px; border-collapse: collapse; font-weight: lighter;
-            cursor: pointer;
-        `;
-        table.innerHTML = `
-            <thead>
-                <tr><th style="border: 1px solid black;">&nbsp;</th>
-                    ${this.showUltra ? '<th style="border: 1px solid black;">Ultra</th>' : ''}
-                    ${this.showSuper ? '<th style="border: 1px solid black;">Super</th>' : ''}
-                    ${this.showHyper ? '<th style="border: 1px solid black;">Hyper</th>' : ''}
-                </tr>
-            </thead>
-            <tbody>
-                ${this.regions.map(region => `
-                    <tr>
-                        <td style="border: 1px solid black;">${region}</td>
-                        ${this.showUltra ? this.generateCell(region, 'Ultra', jsonData) : ''}
-                        ${this.showSuper ? this.generateCell(region, 'Super', jsonData) : ''}
-                        ${this.showHyper ? this.generateCell(region, 'Hyper', jsonData) : ''}
-                    </tr>`).join('')}
-            </tbody>`;
-        table.addEventListener('click', () => this.showModal());
-        document.body.appendChild(table);
-        table.style.display = this.tableVisible ? 'table' : 'none';
-    }
-    generateCell(region, type, jsonData) {
-        const key = `${region}_${type}`;
-        const data = jsonData[key] || {};
-        const timeValue = data.status;
-        const progress = data.progress || 'N/A';
-        return `<td style="border: 1px solid black; color: ${timeValue ? 'orange' : 'black'};">${progress}</td>`;
-    }
-    showModal() {
-        if (document.getElementById('modalOverlay')) return;
+    createModalOverlay() {
         const modalOverlay = document.createElement('div');
         modalOverlay.id = 'modalOverlay';
-        modalOverlay.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.5); z-index: 10000; display: flex; justify-content: center; align-items: center;
-        `;
         const modalContent = document.createElement('div');
-        modalContent.style.cssText = `
-            background: white; padding: 20px; border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); text-align: center; max-width: 600px;
-            display: flex; flex-direction: row;
-        `;
+        modalContent.id ='modalContent';
         const infoSidebar = document.createElement('div');
-        infoSidebar.style.cssText = `
-            flex: 1; background: #f0f0f0; padding: 10px; border-right: 1px solid #ddd;
-        `;
+        infoSidebar.id = 'infoSidebar';
         infoSidebar.innerHTML = `
             <h3>settings</h3>
-            <label><input type="checkbox" id="showUltra" ${this.showUltra ? 'checked' : ''}> Ultra</label><br>
-            <label><input type="checkbox" id="showSuper" ${this.showSuper ? 'checked' : ''}> Super</label><br>
-            <label><input type="checkbox" id="showHyper" ${this.showHyper ? 'checked' : ''}> Hyper</label><br>
+            <label><input type="checkbox" id="showUltra" ${this.showZone[0] ? 'checked' : ''}> Ultra</label><br>
+            <label><input type="checkbox" id="showSuper" ${this.showZone[1] ? 'checked' : ''}> Super</label><br>
+            <label><input type="checkbox" id="showHyper" ${this.showZone[2] ? 'checked' : ''}> Hyper</label><br>
             <hr>
             <h3>information</h3>
-            <button id="loadInfo">load script's info</button>
+            <button id="loadInfo">show full introduction</button>
             <div id="infoContent" style="margin-top: 10px;"></div>
         `;
         modalContent.appendChild(infoSidebar);
         const infoArea = document.createElement('div');
         infoArea.id = 'infoArea';
-        infoArea.style.cssText = `
-            flex: 2; padding: 20px; display: flex; flex-direction: column;
-        `;
+        infoArea.classList = 'infoArea1';
         infoArea.innerHTML = `
-            <h2>About ZcxJames's hornex wave script</h2>
-            <p>author:ZcxJames</p>
-            <p>version: ${this.scriptVersion}</p>
-            <p>Script homepage: <a href="https://zcxjames.top/zcxjames_hornex_wave_script/" target="_blank">zcxjames.top/zcxjames_hornex_wave_script/</a></p>
+            <h2>About ZcxJames' hornex wave script</h2>
+            <p id="info">author:ZcxJames<br>
+            version: ${this.scriptVersion}<br>
+            Script homepage: <a href="https://zcxjames.top/zcxjames_hornex_wave_script/" target="_blank">zcxjames.top/zcxjames_hornex_wave_script/</a></p>
             <button id="closeModalBtn">close</button>
         `;
         modalContent.appendChild(infoArea);
         modalOverlay.appendChild(modalContent);
-        document.body.appendChild(modalOverlay);
-        document.getElementById('closeModalBtn').addEventListener('click', () => {
+        this.showinfo1 = () => this.loadScriptInfo();
+        this.showinfo2 = () => {
+            $('info').innerHTML = `author:ZcxJames<br>
+            version: ${this.scriptVersion}<br>
+            Script homepage: <a href="https://zcxjames.top/zcxjames_hornex_wave_script/" target="_blank">zcxjames.top/zcxjames_hornex_wave_script/</a>`;
+            $('loadInfo').innerHTML = 'show full introduction';
+            infoArea.classList = 'infoArea1';
+            $('loadInfo').removeEventListener('click', this.showinfo2);
+            $('loadInfo').addEventListener('click', this.showinfo1);
+        }
+        this.onchangeU = (event) => {
+            this.showZone[0] = event.target.checked;
+            localStorage.setItem('showUltra', JSON.stringify(this.showZone[0]));
+            this.fetchAndUpdateTable();
+        };
+        this.onchangeS = (event) => {
+            this.showZone[1] = event.target.checked;
+            localStorage.setItem('showSuper', JSON.stringify(this.showZone[1]));
+            this.fetchAndUpdateTable();
+        };
+        this.onchangeH = (event) => {
+            this.showZone[2] = event.target.checked;
+            localStorage.setItem('showHyper', JSON.stringify(this.showZone[2]));
+            this.fetchAndUpdateTable();
+        };
+        this.onclose = () => {
+            $('loadInfo').removeEventListener('click', this.showinfo1);
+            $('showUltra').removeEventListener('change', this.onchangeU);
+            $('showSuper').removeEventListener('change', this.onchangeS);
+            $('showHyper').removeEventListener('change', this.onchangeH);
+            $('closeModalBtn').removeEventListener('click', this.onclose);
             modalOverlay.remove();
-        });
-        document.getElementById('loadInfo').addEventListener('click', () => {
-            this.loadScriptInfo();
-        });
-        document.getElementById('showUltra').addEventListener('change', (event) => {
-            this.showUltra = event.target.checked;
-            localStorage.setItem('showUltra', JSON.stringify(showUltra));
-            this.fetchAndUpdateTable();
-        });
-        document.getElementById('showSuper').addEventListener('change', (event) => {
-            this.showSuper = event.target.checked;
-            localStorage.setItem('showSuper', JSON.stringify(showSuper));
-            this.fetchAndUpdateTable();
-        });
-        document.getElementById('showHyper').addEventListener('change', (event) => {
-            this.showHyper = event.target.checked;
-            localStorage.setItem('showHyper', JSON.stringify(showHyper));
-            this.fetchAndUpdateTable();
-        });
+        };
+        this.modalOverlay = modalOverlay;
     }
-    loadScriptInfo() {
-        document.getElementById('loadInfo').addEventListener('click', () => {
-            this.xmlhttpRequest({
-                method: 'GET',
-                url: 'https://zcxjames.top/script_info.txt',
-                onload: response => {
-                    document.getElementById('infoArea').style.cssText = `
-                        height: 400px;
-                        overflow-y: auto;
-                        padding: 10px;
-                        border: 1px solid #ccc;
-                        background-color: #f9f9f9;
-                        word-wrap: break-word;
-                    `;
-                    document.getElementById('infoArea').innerHTML = `
-                        <h2>about ZcxJames's hornex wave script</h2>
-                        <p>${response.responseText}</p>
-                        <button id="closeModalBtn">close</button>
-                    `;
-                    document.getElementById('closeModalBtn').addEventListener('click', () => {
-                        modalOverlay.remove();
-                    });
+    createTable(){
+        const table = document.createElement('table');
+        table.id = 'jsonDataTable';
+        table.innerHTML = `
+            <thead>
+                <tr><th class="jsonTableCell"></th>
+                    <th class="jsonTableCell" id="thUltra">Ultra</th>
+                    <th class="jsonTableCell" id="thSuper">Super</th>
+                    <th class="jsonTableCell" id="thHyper">Hyper</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${this.regions.map(region => `
+                    <tr id="tr${region}">
+                        <td class="jsonTableCell">${region}</td>
+                        <td class="jsonTableCell" id="${region}_Ultra">N/A</td>
+                        <td class="jsonTableCell" id="${region}_Super">N/A</td>
+                        <td class="jsonTableCell" id="${region}_Hyper">N/A</td>
+                    </tr>`).join('')}
+            </tbody>`;
+        table.addEventListener('click', () => this.showModal());
+        document.body.appendChild(table);
+        this.table = table;
+    }
+    start(){
+        document.addEventListener('keydown', (evt) => this.toggleTableVisibility(evt));
+        this.createModalOverlay();
+        this.createTable();
+        setInterval(() => {
+            this.fetchAndUpdateTable();
+            this.sendPost();
+            this.updateData();
+        }, 1000);
+    }
+    xmlhttpRequest(options){
+        var fetchOptions = {
+            method: options.method,
+            headers: options.headers || {},
+            body: options.data ? JSON.stringify(options.data) : null
+        };
+        fetch(options.url, fetchOptions)
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                }
+            })
+            .then(data => {
+                if (options.onload) {
+                    options.onload({ responseText: data });
+                }
+            })
+            .catch(error => {
+                if (options.onerror) {
+                    options.onerror({ statusText: error.message });
                 }
             });
+    }
+    updateTable(jsonData) {
+        if(!this.table) return;
+        const columnCount = this.showZone.reduce((cnt, i) => cnt + i, 0);
+        if (columnCount === 0) {
+            this.tableVisible = false;
+            return;
+        }
+        const tableWidth = columnCount * 75 + 50;
+        this.table.style.width = `${tableWidth}px`;
+        $('thUltra').style.display = this.showZone[0] ? 'table-cell' : 'none';
+        $('thSuper').style.display = this.showZone[1] ? 'table-cell' : 'none';
+        $('thHyper').style.display = this.showZone[2] ? 'table-cell' : 'none';
+        Object.entries(jsonData).forEach(([region, data]) => {
+            this.updateCell(region, data);
+        })
+        this.table.style.display = this.tableVisible ? 'table' : 'none';
+    }
+    updateCell(key, data) {
+        const timeValue = data.status;
+        const progress = data.progress || 'N/A';
+        let cell = $(key);
+        if(!this.showZone[0] && key.includes('Ultra') || !this.showZone[1] && key.includes('Super') || !this.showZone[2] && key.includes('Hyper')){
+            cell.style.display = 'none';
+            return;
+        }
+        if(this.showZone[0] && key.includes('Ultra') || this.showZone[1] && key.includes('Super') || this.showZone[2] && key.includes('Hyper')){
+            cell.style.display = 'table-cell';
+        }
+        cell.innerHTML = progress;
+        cell.style.color = timeValue ? 'orange' : 'black';
+    }
+    showModal() {
+        if ($('modalOverlay')) return;
+        document.body.appendChild(this.modalOverlay);
+        $('loadInfo').addEventListener('click', this.showinfo1);
+        $('showUltra').addEventListener('change', this.onchangeU);
+        $('showSuper').addEventListener('change', this.onchangeS);
+        $('showHyper').addEventListener('change', this.onchangeH);
+        $('closeModalBtn').addEventListener('click', this.onclose);
+    }
+    loadScriptInfo() {
+        this.xmlhttpRequest({
+            method: 'GET',
+            url: 'https://zcxjames.top/script_info.txt',
+            onload: response => {
+                $('infoArea').classList = 'infoArea2';
+                $('info').innerHTML = response.responseText;
+                $('loadInfo').innerHTML = 'show brief introduction';
+                $('loadInfo').removeEventListener('click', this.showinfo1);
+                $('loadInfo').addEventListener('click', this.showinfo2);
+            }
         });
     }
     fetchAndUpdateTable() {
@@ -222,40 +227,40 @@ class ZcxJamesWaveTable{
             method: 'GET',
             url: 'https://zcxjames.top/evilcat.json',
             onload: response => {
-                this.createTable(JSON.parse(response.responseText));
+                this.updateTable(JSON.parse(response.responseText));
+            },
+            onerror: error => {
+                console.log(error)
             }
         });
     }
     toggleTableVisibility(event) {
         if (event.key === 'Tab') {
             event.preventDefault();
-            if (!this.showUltra && !this.showSuper && !this.showHyper) {
-                this.showUltra = false;
-                this.showSuper = true;
-                this.showHyper = true;
-                localStorage.setItem('showUltra', JSON.stringify(this.showUltra));
-                localStorage.setItem('showSuper', JSON.stringify(this.showSuper));
-                localStorage.setItem('showHyper', JSON.stringify(this.showHyper));
+            if (!this.showZone.reduce((cnt, i) => cnt + i, 0)) {
+                this.showZone = [false, true, true];
+                localStorage.setItem('showUltra', JSON.stringify(this.showZone[0]));
+                localStorage.setItem('showSuper', JSON.stringify(this.showZone[1]));
+                localStorage.setItem('showHyper', JSON.stringify(this.showZone[2]));
                 this.fetchAndUpdateTable();
                 this.tableVisible = true;
             } else {
                 this.tableVisible = !this.tableVisible;
             }
-            const table = document.getElementById('jsonDataTable');
-            if (table) table.style.display = this.tableVisible ? 'table' : 'none';
+            if (this.table) this.table.style.display = this.tableVisible ? 'table' : 'none';
         }
     }
     updateData() {
         this.currentServer = Object.keys(this.servers).find(server =>
-            document.querySelector(`div.btn.active[style="background-color: ${this.servers[server]};"]`)) || '';
+            $_(`div.btn.active[style="background-color: ${this.servers[server]};"]`)) || '';
         this.currentZone = Object.keys(this.zones).find(zone =>
-            document.querySelector(`div.zone-name[stroke="${zone}"]`)) || '';
-        if (document.querySelector('div.zone-name[stroke="Waveroom"]')) this.currentZone = 'waveroom';
-        const waveSpan = document.querySelector('body > div.hud > div.zone > div.progress > span[stroke]');
+            $_(`div.zone-name[stroke="${zone}"]`)) || '';
+        if ($_('div.zone-name[stroke="Waveroom"]')) this.currentZone = 'waveroom';
+        const waveSpan = $_('body > div.hud > div.zone > div.progress > span[stroke]');
         const waveText = waveSpan ? waveSpan.getAttribute('stroke') : '';
         const waveMatch = waveText.match(/Wave (\d+)/i);
         this.progress = waveMatch ? 'Wave ' + waveMatch[1] : '0%';
-        document.querySelectorAll('div.bar').forEach(bar => {
+        $$_('div.bar').forEach(bar => {
             const matches = bar.style.transform.match(/translate\(calc\(-(\d+(\.\d+)?)% \+ \d+(\.\d+)?em\), 0px\)/);
             if (matches && matches[1]) {
                 const tempProgress = (100 - parseFloat(matches[1])).toFixed(4);
@@ -265,7 +270,7 @@ class ZcxJamesWaveTable{
     }
     sendPost() {
         if (document.hidden) return;
-        const waveEndingSpan = document.querySelector('span[stroke="Wave Ending..."]');
+        const waveEndingSpan = $_('span[stroke="Wave Ending..."]');
         if (waveEndingSpan) return;
         if (this.currentServer !== this.previousServer || this.currentZone !== this.previousZone) {
             this.previousServer = this.currentServer;
@@ -455,47 +460,98 @@ class HornexHack{
         this.saveModule();
     }
     listModule(){
-        for(const item of this.configKeys){
+        this.configKeys.forEach(item => {
             this.addChat(`${item}: ${this.isEnabled(item)} (defaults to ${this.default[item]})`, '#ffffff');
-        }
+        });
+    }
+    createBadge(item) {
+        let statusBadge = document.createElement('span');
+        statusBadge.className = `badge ${this.bindKeys[item] ? 'badge-binded' : 'badge-unbinded'}`;
+        statusBadge.textContent = Object.keys(this.bindKeys).includes(item) ? 
+            `Binded to ${this.bindKeys[item]}` : 'Not binded';
+        statusBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.startKeyBinding(item, statusBadge);
+        });
+        return statusBadge;
+    }
+    startKeyBinding(item, badgeElement) {
+        badgeElement.className = 'badge badge-binding';
+        badgeElement.textContent = 'Press a key to bind...'
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.bindKey(item, 'clear')
+                document.removeEventListener('keydown', keyHandler);
+                badgeElement.className = 'badge badge-unbinded';
+                badgeElement.textContent = `Not binded`;
+                return;
+            }
+            if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+                return;
+            }
+            this.bindKey(item, e.key);
+            badgeElement.textContent = `Binded to ${this.bindKeys[item]}`;
+            badgeElement.className = 'badge badge-binded';
+            document.removeEventListener('keydown', keyHandler);
+        };
+        document.addEventListener('keydown', keyHandler);
     }
     openGUI(){
         let main = document.createElement('div');
-        for(const item of this.configKeys){
-            let idx = document.createElement('div');
-            let txt = document.createElement('span');
-            txt.innerHTML = item + (Object.keys(this.bindKeys).includes(item) ? ` (Binded to ${this.bindKeys[item]})` : ' (Not bounded)');
-            txt.style.margin = '10px';
-            idx.appendChild(txt);
-            let cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.checked = this.isEnabled(item);
-            let that = this;
-            cb.onclick = () => {
-                that.toggle(item);
-            };
-            cb.style.float = 'right';
-            idx.appendChild(cb);
-            main.appendChild(idx);
-        }
-        for(const item of this.triggerKeys){
-            let idx = document.createElement('div');
-            let txt = document.createElement('span');
-            txt.innerHTML = item + (Object.keys(this.bindKeys).includes(item) ? ` (Binded to ${this.bindKeys[item]})` : ' (Not bounded)');
-            txt.style.margin = '10px';
-            idx.appendChild(txt);
-            main.appendChild(idx);
-        }
-        GUIUtil.createPopupBox(main, 370, (this.configKeys.length + this.triggerKeys.length) * 30);
+        let header = document.createElement('div');
+        header.className = 'p-header';
+        header.innerHTML = `
+            <div class="p-title">Settings</div>
+        `;
+        main.appendChild(header);
+        this.configKeys.forEach(item => {
+            let itemDiv = document.createElement('div');
+            itemDiv.className = 'config-item';
+            let label = document.createElement('span');
+            label.className = 'config-label';
+            label.innerHTML = item;
+            let statusBadge = this.createBadge(item);
+            label.appendChild(statusBadge);
+            itemDiv.appendChild(label);
+            let switchLabel = document.createElement('label');
+            switchLabel.className = 'switch';
+            let checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = this.isEnabled(item);
+            checkbox.onclick = () => this.toggle(item);
+            let slider = document.createElement('span');
+            slider.className = 'slider';
+            switchLabel.appendChild(checkbox);
+            switchLabel.appendChild(slider);
+            itemDiv.appendChild(switchLabel);
+            main.appendChild(itemDiv);
+        });
+        this.triggerKeys.forEach(item => {
+            let itemDiv = document.createElement('div');
+            itemDiv.className = 'config-item';
+            let label = document.createElement('span');
+            label.className = 'config-label';
+            label.textContent = item;
+            let statusBadge = this.createBadge(item);
+            label.appendChild(statusBadge);
+            itemDiv.appendChild(label);
+            main.appendChild(itemDiv);
+        });
+        const itemHeight = 48;
+        const headerHeight = 54;
+        const totalHeight = headerHeight + (this.configKeys.length + this.triggerKeys.length) * itemHeight;
+        return GUIUtil.createPopupBox(main, 400, totalHeight);
     }
     bindKey(module, key){
         if(key == 'clear'){
             delete this.bindKeys[module];
             this.addChat(`Cleared keybind of ${module}`);
+            this.saveModule();
             return;
         }
         this.bindKeys[module] = key;
         this.addChat(`Set keybind of ${module} to ${key}`);
+        this.saveModule();
     }
     LS_set(key, value){
         localStorage.setItem(key, value);
@@ -519,14 +575,14 @@ class HornexHack{
             this.saveModule();
             return;
         }
-        for(const item of this.configKeys){
+        this.configKeys.forEach(item => {
             if(!Object.keys(cfg).includes(item)){
                 this.config[item] = this.default[item];
                 this.setEnabled(item, this.default[item]);
             }else{
                 this.setEnabled(item, cfg[item]);
             }
-        }
+        });
         this.bindKeys = keys;
     }
     // ----- Command -----
@@ -547,7 +603,6 @@ class HornexHack{
         this.ingame = true;
         this.modifyPlayerList();
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
-        if(this.isEnabled('showRealTimePickup') && !this.isEnabled('RPShowNumberOnly')) this.petalDiv.style.display = '';
         // console.log(this.LS_get('player_id'));
     }
     notCommand(cmd){
@@ -621,11 +676,11 @@ class HornexHack{
         this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
     }
     viewMob(mobName){
-        let mobs = document.querySelector('.zone-mobs'), id;
+        let mobs = $_('.zone-mobs'), id;
         let [name, rarityNum] = this.parseRarity(mobName);
-        for(const i of this.moblst[rarityNum]){
+        this.moblst[rarityNum].forEach(i => {
             if(i.name.replaceAll(' ', '') == name) id = i;
-        }
+        });
         if(!id){
             this.addChat(`Mob not found: ${name}`, '#ff7f50');
             return;
@@ -664,15 +719,16 @@ class HornexHack{
             userCount.push(elem.getAttribute('stroke').slice(0, -6));
         }
         let current = this.getServer();
-        for(const item of servers){
-            let idx = document.createElement('div');
-            let txt = document.createElement('span');
-            txt.innerHTML = item + ' ' + (userCount[servers.indexOf(item)] || 'UK');
-            txt.style.margin = '10px';
-            txt.style.fontSize = '20px';
-            idx.appendChild(txt);
+        servers.forEach(item => {
+            let itemDiv = document.createElement('div');
+            itemDiv.className = 'config-item';
+            let label = document.createElement('span');
+            label.className = 'config-label';
+            label.innerHTML = item + ' ' + (userCount[servers.indexOf(item)] || 'Unknown');
+            itemDiv.appendChild(label);
             let cb = document.createElement('input');
             cb.type = 'button';
+            cb.classList.add('button');
             if(item == current){
                 cb.disabled = true;
                 cb.value = 'Current';
@@ -680,16 +736,15 @@ class HornexHack{
                 cb.value = 'Change to';
             }
             cb.setAttribute('id', servers.indexOf(item));
-            let that = this;
             cb.onclick = () => {
-                that.changeServer(cb.getAttribute('id'));
-                that.change_gui.close();
+                this.changeServer(cb.getAttribute('id'));
+                this.change_gui.close();
             };
             cb.style.float = 'right';
-            idx.appendChild(cb);
-            main.appendChild(idx);
-        }
-        this.change_gui = GUIUtil.createPopupBox(main, 250, 250);
+            itemDiv.appendChild(cb);
+            main.appendChild(itemDiv);
+        });
+        this.change_gui = GUIUtil.createPopupBox(main, 250, 350);
     }
     clearDots(){
         this.trackUI.innerHTML = `Not Tracking`;
@@ -734,17 +789,16 @@ class HornexHack{
     // ----- Event -----
     registerDeath(){
         let div = $_('.score-overlay');
-        let that = this;
-        this.listeners['death'] = this.listeners['death'] || new this.MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
+        this.listeners['death'] = this.listeners['death'] || new this.MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
                 if (mutation.type == 'attributes') {
                     let style = mutation.target.style;
                     if(style.display != 'none'){
-                        that.ingame = false;
-                        if(that.isEnabled('autoRespawn') && !that.isSuicide){
-                            that.respawn();
+                        this.ingame = false;
+                        if(this.isEnabled('autoRespawn') && !this.isSuicide){
+                            this.respawn();
                         }
-                        that.isSuicide = false;
+                        this.isSuicide = false;
                     }
                 }
             });
@@ -761,15 +815,13 @@ class HornexHack{
         let totalKills = $_('\span.total-kills').getAttribute('stroke');
         let timeAlive = $_('\span.time-alive').getAttribute('stroke');
         let box = GUIUtil.createPopupBox(document.createElement('div'), 300, 150);
-        box.appendChild(document.createTextNode(`You died @ ${this.getPos().join(', ')} because of ${deathReason}`));
-        box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode('Petals: ' + this.petalCount.join('/')))
-        box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode('Score: ' + maxScore));
-        box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode('Total Kills: ' + totalKills));
-        box.appendChild(document.createElement('br'));
-        box.appendChild(document.createTextNode('Time Alive: ' + timeAlive));
+        let itemDiv = document.createElement('div');
+        itemDiv.className = 'config-item';
+        let label = document.createElement('span');
+        label.className = 'config-label';
+        label.innerHTML = `You died @ ${this.getPos().join(', ')} because of ${deathReason}<br>Petals: ${this.petalCount.join('/')}<br>Score: ${maxScore}<br>Total Kills: ${totalKills}<br>Time Alive: ${timeAlive}`;
+        itemDiv.appendChild(label);
+        box.appendChild(itemDiv);
         if(!quitBtn.classList.contains('red')){
             quitBtn.onclick();
             if(this.isEnabled('autoClickPlay')){
@@ -796,14 +848,15 @@ class HornexHack{
             if(!this.ingame) this.trackUI.style.display = 'none';
             if(this.ingame) this.updatePetal();
             this.clearDots();
-            if(this.isEnabled('showRealTimePickup')) this.petalDiv.style.display = '';
-            else this.petalDiv.style.display = 'none';
+            if(this.isEnabled('showRealTimePickup') && !this.isEnabled('RPShowNumberOnly')){
+                this.petalDiv.style.display = '';
+            }else this.petalDiv.style.display = 'none';
         }, 1000);
     }
     registerChat(){
         let div = $_('body > div.common > div.chat > div');
-        this.listeners['chat'] = this.listeners['chat'] || new this.MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
+        this.listeners['chat'] = this.listeners['chat'] || new this.MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
                 if(mutation.type == 'childList'){
                     let chat = mutation.addedNodes[0];
                     if(chat){
@@ -876,10 +929,10 @@ class HornexHack{
         }
     }
     updateMob(mob){
-        let tier = mob.tierStr, type = this.moblst, cur;
-        for(const i of type[mob.tier]){
+        let tier = mob.tierStr, cur;
+        this.moblst[mob.tier].forEach(i => {
             if(i.type == mob.type) cur = i;
-        }
+        });
         if(!cur) return;
         let name = cur.uiName;
         if(mob.isShiny && !mob.shinyFlag && this.isEnabled('shinyAlert')){
@@ -958,100 +1011,99 @@ class HornexHack{
         let resizeDirection = "";
         let offsetX = 0, offsetY = 0;
         let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight, resizeStartLeft, resizeStartTop;
-        let that = this;
-        this.petalDiv.addEventListener("mousedown", function (e) {
-            const rect = that.petalDiv.getBoundingClientRect();
+        this.petalDiv.addEventListener("mousedown", (e) => {
+            const rect = this.petalDiv.getBoundingClientRect();
             if (e.clientX > rect.right - 10 && e.clientY > rect.bottom - 10) {
                 isResizing = true;
                 resizeDirection = "right-bottom";
                 resizeStartX = e.clientX;
                 resizeStartY = e.clientY;
-                resizeStartWidth = parseInt(that.petalDiv.style.width);
-                resizeStartHeight = parseInt(that.petalDiv.style.height);
-                resizeStartLeft = parseInt(that.petalDiv.style.left);
-                resizeStartTop = parseInt(that.petalDiv.style.top);
-                that.petalDiv.style.cursor = "se-resize";
+                resizeStartWidth = parseInt(this.petalDiv.style.width);
+                resizeStartHeight = parseInt(this.petalDiv.style.height);
+                resizeStartLeft = parseInt(this.petalDiv.style.left);
+                resizeStartTop = parseInt(this.petalDiv.style.top);
+                this.petalDiv.style.cursor = "se-resize";
             } else if (e.clientX > rect.right - 10) {
                 isResizing = true;
                 resizeDirection = "right";
                 resizeStartX = e.clientX;
-                resizeStartWidth = parseInt(that.petalDiv.style.width);
-                resizeStartLeft = parseInt(that.petalDiv.style.left);
-                that.petalDiv.style.cursor = "e-resize";
+                resizeStartWidth = parseInt(this.petalDiv.style.width);
+                resizeStartLeft = parseInt(this.petalDiv.style.left);
+                this.petalDiv.style.cursor = "e-resize";
             } else if (e.clientY > rect.bottom - 10) {
                 isResizing = true;
                 resizeDirection = "bottom";
                 resizeStartY = e.clientY;
-                resizeStartHeight = parseInt(that.petalDiv.style.height);
-                resizeStartTop = parseInt(that.petalDiv.style.top);
-                that.petalDiv.style.cursor = "s-resize";
+                resizeStartHeight = parseInt(this.petalDiv.style.height);
+                resizeStartTop = parseInt(this.petalDiv.style.top);
+                this.petalDiv.style.cursor = "s-resize";
             } else if (e.clientX < rect.left + 10) {
                 isResizing = true;
                 resizeDirection = "left";
                 resizeStartX = e.clientX;
-                resizeStartWidth = parseInt(that.petalDiv.style.width);
-                resizeStartLeft = parseInt(that.petalDiv.style.left);
-                that.petalDiv.style.cursor = "w-resize";
+                resizeStartWidth = parseInt(this.petalDiv.style.width);
+                resizeStartLeft = parseInt(this.petalDiv.style.left);
+                this.petalDiv.style.cursor = "w-resize";
             } else if (e.clientY < rect.top + 10) {
                 isResizing = true;
                 resizeDirection = "top";
                 resizeStartY = e.clientY;
-                resizeStartHeight = parseInt(that.petalDiv.style.height);
-                resizeStartTop = parseInt(that.petalDiv.style.top);
-                that.petalDiv.style.cursor = "n-resize";
+                resizeStartHeight = parseInt(this.petalDiv.style.height);
+                resizeStartTop = parseInt(this.petalDiv.style.top);
+                this.petalDiv.style.cursor = "n-resize";
             } else {
                 isDragging = true;
-                offsetX = e.clientX - that.petalDiv.offsetLeft;
-                offsetY = e.clientY - that.petalDiv.offsetTop;
-                that.petalDiv.style.cursor = "grabbing";
+                offsetX = e.clientX - this.petalDiv.offsetLeft;
+                offsetY = e.clientY - this.petalDiv.offsetTop;
+                this.petalDiv.style.cursor = "grabbing";
             }
         });
-        document.addEventListener("mousemove", function (e) {
+        document.addEventListener("mousemove", (e) => {
             if (isDragging) {
-                that.petalDiv.style.left = e.clientX - offsetX + "px";
-                that.petalDiv.style.top = e.clientY - offsetY + "px";
+                this.petalDiv.style.left = e.clientX - offsetX + "px";
+                this.petalDiv.style.top = e.clientY - offsetY + "px";
             } else if (isResizing) {
                 const deltaX = e.clientX - resizeStartX;
                 const deltaY = e.clientY - resizeStartY;
                 if (resizeDirection.includes("right")) {
                     const newWidth = resizeStartWidth + deltaX;
-                    that.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
+                    this.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
                 }
                 if (resizeDirection.includes("bottom")) {
                     const newHeight = resizeStartHeight + deltaY;
-                    that.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
+                    this.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
                 }
                 if (resizeDirection.includes("left")) {
                     const newWidth = resizeStartWidth - deltaX;
-                    that.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
-                    that.petalDiv.style.left = resizeStartLeft + deltaX + "px";
+                    this.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
+                    this.petalDiv.style.left = resizeStartLeft + deltaX + "px";
                 }
                 if (resizeDirection.includes("top")) {
                     const newHeight = resizeStartHeight - deltaY;
-                    that.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
-                    that.petalDiv.style.top = resizeStartTop + deltaY + "px";
+                    this.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
+                    this.petalDiv.style.top = resizeStartTop + deltaY + "px";
                 }
-                const currentHeight = parseInt(that.petalDiv.style.height);
-                that.collectedPetals.style.maxHeight = currentHeight + "px";
+                const currentHeight = parseInt(this.petalDiv.style.height);
+                this.collectedPetals.style.maxHeight = currentHeight + "px";
             }
         });
-        document.addEventListener("mouseup", function () {
+        document.addEventListener("mouseup", () => {
             isDragging = false;
             isResizing = false;
-            that.petalDiv.style.cursor = "move";
+            this.petalDiv.style.cursor = "move";
         });
-        this.petalDiv.addEventListener("mousemove", function (e) {
-            const rect = that.petalDiv.getBoundingClientRect();
+        this.petalDiv.addEventListener("mousemove", (e) => {
+            const rect = this.petalDiv.getBoundingClientRect();
             const isAtRightEdge = e.clientX > rect.right - 10 && e.clientX < rect.right + 10;
             const isAtBottomEdge = e.clientY > rect.bottom - 10 && e.clientY < rect.bottom + 10;
             const isAtLeftEdge = e.clientX > rect.left - 10 && e.clientX < rect.left + 10;
             const isAtTopEdge = e.clientY > rect.top - 10 && e.clientY < rect.top + 10;
-            if (isAtRightEdge && isAtBottomEdge) that.petalDiv.style.cursor = "se-resize";
-            else if (isAtRightEdge) that.petalDiv.style.cursor = "e-resize";
-            else if (isAtBottomEdge) that.petalDiv.style.cursor = "s-resize";
-            else if (isAtLeftEdge) that.petalDiv.style.cursor = "w-resize";
-            else if (isAtTopEdge) that.petalDiv.style.cursor = "n-resize";
-            else that.petalDiv.style.cursor = "move";
+            if (isAtRightEdge && isAtBottomEdge) this.petalDiv.style.cursor = "se-resize";
+            else if (isAtRightEdge) this.petalDiv.style.cursor = "e-resize";
+            else if (isAtBottomEdge) this.petalDiv.style.cursor = "s-resize";
+            else if (isAtLeftEdge) this.petalDiv.style.cursor = "w-resize";
+            else if (isAtTopEdge) this.petalDiv.style.cursor = "n-resize";
+            else this.petalDiv.style.cursor = "move";
         });
         document.body.appendChild(this.petalDiv);
     }
