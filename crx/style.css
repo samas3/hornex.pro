@@ -244,3 +244,34 @@ input:checked + .slider:before {
 .jsonTableCell{
     border: 1px solid black;
 }
+.table-container {
+    background: #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    margin: 16px 0;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.alt-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #2d2d37;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.alt-table td {
+    padding: 12px 16px;
+    color: #e0e0e0;
+    font-size: 0.9em;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.alt-table tr:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+.alt-table tr:hover {
+    background: rgba(99,102,241,0.08) !important;
+    transform: translateX(4px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.align-right {
+    text-align: right;
+}

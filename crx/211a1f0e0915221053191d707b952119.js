@@ -1,6 +1,6 @@
 const $ = (i) => document.getElementById.bind(document)(i);
-const $_ = (i) => document.querySelector.bind(document)(i);
-const $$_ = (i) => document.querySelectorAll.bind(document)(i);
+const $$ = (i) => document.querySelector.bind(document)(i);
+const $_ = (i) => document.querySelectorAll.bind(document)(i);
 const GUIUtil = {
     createPopupBox: function(elem, w, h){
         let box = document.createElement('div');
@@ -48,6 +48,7 @@ class ZcxJamesWaveTable{
         this.table = null;
     }
     createModalOverlay() {
+        if($('modalOverlay')) return;
         const modalOverlay = document.createElement('div');
         modalOverlay.id = 'modalOverlay';
         const modalContent = document.createElement('div');
@@ -113,6 +114,7 @@ class ZcxJamesWaveTable{
         this.modalOverlay = modalOverlay;
     }
     createTable(){
+        if($('jsonDataTable')) return;
         const table = document.createElement('table');
         table.id = 'jsonDataTable';
         table.innerHTML = `
@@ -252,15 +254,15 @@ class ZcxJamesWaveTable{
     }
     updateData() {
         this.currentServer = Object.keys(this.servers).find(server =>
-            $_(`div.btn.active[style="background-color: ${this.servers[server]};"]`)) || '';
+            $$(`div.btn.active[style="background-color: ${this.servers[server]};"]`)) || '';
         this.currentZone = Object.keys(this.zones).find(zone =>
-            $_(`div.zone-name[stroke="${zone}"]`)) || '';
-        if ($_('div.zone-name[stroke="Waveroom"]')) this.currentZone = 'waveroom';
-        const waveSpan = $_('body > div.hud > div.zone > div.progress > span[stroke]');
+            $$(`div.zone-name[stroke="${zone}"]`)) || '';
+        if ($$('div.zone-name[stroke="Waveroom"]')) this.currentZone = 'waveroom';
+        const waveSpan = $$('body > div.hud > div.zone > div.progress > span[stroke]');
         const waveText = waveSpan ? waveSpan.getAttribute('stroke') : '';
         const waveMatch = waveText.match(/Wave (\d+)/i);
         this.progress = waveMatch ? 'Wave ' + waveMatch[1] : '0%';
-        $$_('div.bar').forEach(bar => {
+        $_('div.bar').forEach(bar => {
             const matches = bar.style.transform.match(/translate\(calc\(-(\d+(\.\d+)?)% \+ \d+(\.\d+)?em\), 0px\)/);
             if (matches && matches[1]) {
                 const tempProgress = (100 - parseFloat(matches[1])).toFixed(4);
@@ -270,7 +272,7 @@ class ZcxJamesWaveTable{
     }
     sendPost() {
         if (document.hidden) return;
-        const waveEndingSpan = $_('span[stroke="Wave Ending..."]');
+        const waveEndingSpan = $$('span[stroke="Wave Ending..."]');
         if (waveEndingSpan) return;
         if (this.currentServer !== this.previousServer || this.currentZone !== this.previousZone) {
             this.previousServer = this.currentServer;
@@ -306,7 +308,6 @@ class HornexHack{
             allowInvalidCommand: false, // 允许聊天输入无效指令
             shinyAlert: true, // 显示shiny警报
             showRealTimePickup: true, // 显示实时拾取掉落物
-            RPShowNumberOnly: false, // 只显示掉落物数量
             zcxJamesScript: true, // ZcxJames脚本适配
         };
         this.configKeys = Object.keys(this.default);
@@ -356,7 +357,6 @@ class HornexHack{
         this.tracking = null;
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
         this.isSuicide = false;
-        this.statusAbove = '';
         this.bindKeys = {};
         this.triggers = {
             'openGUI': () => this.openGUI(),
@@ -368,11 +368,7 @@ class HornexHack{
                 }
             },
             'toggleTrack': () => {
-                if(this.trackUI.style.display == 'none'){
-                    this.trackUI.style.display = '';
-                }else{
-                    this.trackUI.style.display = 'none';
-                }
+                this.setVisibility(this.trackUI, this.trackUI.style.display);
             },
             'changeServer': () => this.changeGUI(),
         };
@@ -382,6 +378,7 @@ class HornexHack{
         this.chatHistoryIndex = 0;
         this.listeners = {};
         this.intervals = {};
+        this.altList = [];
     }
     // ----- Notice -----
     addChat(text, color='#ff00ff'){
@@ -415,7 +412,7 @@ class HornexHack{
         }, 100);
     }
     setStatus(content){
-        this.status = `${this.statusAbove}<br>${this.name}<br>${content}`;
+        this.status = `${this.name}<br>${content}`;
     }
     loadTrack(){
         let div = GUIUtil.createInfoBox();
@@ -430,11 +427,62 @@ class HornexHack{
         div.innerHTML = "Not Tracking";
         this.trackUI = div;
     }
-    modifyPlayerList(){
-        $_('.player-list-btn').style.display = '';
-        $_('.censor-cb').checked = false;
-        $_('body > div.common > div.dialog.player-list > label > span').setAttribute('stroke', 'Enable Copy');
-        $_('body > div.common > div.dialog.player-list > div.player-list-info').setAttribute('stroke', 'Checked=Copy, Unchecked=View Profile')
+    modifyDOM(){
+        this.setVisibility($$('.player-list-btn'), true);
+        $$('.censor-cb').checked = false;
+        this.setStroke($$('body > div.common > div.dialog.player-list > label > span'), 'Enable Copy');
+        this.setStroke($$('body > div.common > div.dialog.player-list > div.player-list-info'), 'Checked=Copy, Unchecked=View Profile');
+        this.setVisibility($$('.export-btn'), false);
+        this.setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > span'), 'Account Manager');
+        this.setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > div > span'), 'Manage your accounts, modified by samas3');
+    }
+    modifyImport(){
+        this.setStroke($$('body > div.common > div.msg-overlay > div > div.msg-title'), 'Account Manager');
+        this.setStroke($$('body > div.common > div.msg-overlay > div > div:nth-child(2)'), '');
+        this.setStroke($$('body > div.common > div.msg-overlay > div > div:nth-child(4)'), '');
+        this.altList = this.LS_get('accounts') || [];
+        this.createAltTable();
+        this.updateAlt();
+        let txt = $$('body > div.common > div.msg-overlay > div > div.export-row > input.textbox');
+        if(!txt.value) txt.value = this.LS_get('player_id');
+        $$('body > div.common > div.msg-overlay > div > div.export-row > div').addEventListener('click', () => {
+            let value = txt.value.trim();
+            if(!this.altList.includes(value)) this.altList.push(value);
+            this.updateAlt();
+        })
+    }
+    createAltTable(){
+        let div = document.createElement('div');
+        div.classList = 'table-container';
+        let table = document.createElement('table');
+        table.id = 'altTable';
+        table.classList = 'alt-table';
+        table.innerHTML = `
+            <tbody id='altBody'>
+            </tbody>
+        `;
+        this.altTable = table;
+        div.appendChild(table);
+        $$('body > div.common > div.msg-overlay > div').appendChild(div);
+    }
+    addTableRow(account){
+        $('altBody').innerHTML += `<tr onclick="` + `document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > input.textbox').value = '${account}'` + `">
+        <td>${account}</td><td class="align-right"><button id="` + `${account}` + `">Delete</button></td>
+        </tr>`;
+    }
+    updateAlt(){
+        $('altBody').innerHTML = '';
+        this.altList.forEach(account => {
+            this.addTableRow(account);
+        });
+        $_('.align-right > button').forEach(node => {
+            const account = node.id;
+            node.addEventListener('click', () => {
+                this.altList = this.altList.filter(i => i != account);
+                this.updateAlt();
+            });
+        })
+        this.LS_set('accounts', JSON.stringify(this.altList));
     }
     // ----- Module -----
     hasModule(module){
@@ -585,6 +633,16 @@ class HornexHack{
         });
         this.bindKeys = keys;
     }
+    setStroke(element, text){
+        if(element){
+            element.setAttribute('stroke', text);
+        }
+    }
+    setVisibility(element, visible){
+        if(element){
+            element.style.display = visible ? '' : 'none';
+        }
+    }
     // ----- Command -----
     preload(){
         this.loadStatus();
@@ -593,7 +651,13 @@ class HornexHack{
         if(this.isEnabled('zcxJamesScript')){
             this.table.start();
         }
-        this.preparePetalDiv();
+        this.modifyDOM();
+        let checkDOM = setInterval(() => {
+            if($$('div[stroke="You will also be logged out of Discord if you are logged in."]')){
+                clearInterval(checkDOM);
+                this.modifyImport();
+            }
+        }, 1);
     }
     onload(){
         this.addChat(`${this.name} enabled!`);
@@ -601,8 +665,6 @@ class HornexHack{
         this.register();
         this.loadTrack();
         this.ingame = true;
-        this.modifyPlayerList();
-        this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
         // console.log(this.LS_get('player_id'));
     }
     notCommand(cmd){
@@ -625,9 +687,9 @@ class HornexHack{
         return id.toString(36);
     }
     getWave(){
-        let name = $_('body > div.hud > div.zone > div.zone-name').getAttribute('stroke');
-        let status = $_('body > div.hud > div.zone > div.progress > span').getAttribute('stroke');
-        let prog = $_('body > div.hud > div.zone > div.progress > div').style.transform;
+        let name = $$('body > div.hud > div.zone > div.zone-name').getAttribute('stroke');
+        let status = $$('body > div.hud > div.zone > div.progress > span').getAttribute('stroke');
+        let prog = $$('body > div.hud > div.zone > div.progress > div').style.transform;
         let start = prog.indexOf('calc(') + 5;
         prog = prog.substr(start, prog.indexOf('%') - start);
         if(!status || !prog) return 'Not ingame';
@@ -676,7 +738,7 @@ class HornexHack{
         this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
     }
     viewMob(mobName){
-        let mobs = $_('.zone-mobs'), id;
+        let mobs = $$('.zone-mobs'), id;
         let [name, rarityNum] = this.parseRarity(mobName);
         this.moblst[rarityNum].forEach(i => {
             if(i.name.replaceAll(' ', '') == name) id = i;
@@ -706,7 +768,7 @@ class HornexHack{
         setTimeout(() => {$_('.play-btn').click()}, 1000 * time);
     }
     changeServer(server){
-        $$_('.btn')[13 + parseInt(server)].click();
+        $_('.btn')[13 + parseInt(server)].click();
         this.clickPlay(3);
         this.addChat(`Changed server to ${this.getServer()}`);
     }
@@ -715,7 +777,7 @@ class HornexHack{
         let servers = ['EU1', 'EU2', 'AS1', 'US1', 'US2', 'AS2'];
         let userCount = [];
         for(let i = 2; i <= 7; i++){
-            let elem = $_(`body > div.menu > div.server-area > div:nth-child(${i}) > span.small`);
+            let elem = $$(`body > div.menu > div.server-area > div:nth-child(${i}) > span.small`);
             userCount.push(elem.getAttribute('stroke').slice(0, -6));
         }
         let current = this.getServer();
@@ -748,7 +810,7 @@ class HornexHack{
     }
     clearDots(){
         this.trackUI.innerHTML = `Not Tracking`;
-        let minimap = $_('.minimap');
+        let minimap = $$('.minimap');
         minimap.childNodes.forEach(item => {
             if(item.classList && item.classList.contains('minimap-dot') && item.childNodes.length == 0){
                 minimap.removeChild(item);
@@ -788,7 +850,7 @@ class HornexHack{
     }
     // ----- Event -----
     registerDeath(){
-        let div = $_('.score-overlay');
+        let div = $$('.score-overlay');
         this.listeners['death'] = this.listeners['death'] || new this.MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.type == 'attributes') {
@@ -809,17 +871,17 @@ class HornexHack{
         });
     }
     respawn(){
-        let quitBtn = $_('body > div.score-overlay > div.score-area > div.btn.continue-btn');
-        let deathReason = $_('body > div.score-overlay > div.score-area > span.killer').getAttribute('stroke');
-        let maxScore = $_('\span.max-score').getAttribute('stroke');
-        let totalKills = $_('\span.total-kills').getAttribute('stroke');
-        let timeAlive = $_('\span.time-alive').getAttribute('stroke');
+        let quitBtn = $$('body > div.score-overlay > div.score-area > div.btn.continue-btn');
+        let deathReason = $$('body > div.score-overlay > div.score-area > span.killer').getAttribute('stroke');
+        let maxScore = $$('\span.max-score').getAttribute('stroke');
+        let totalKills = $$('\span.total-kills').getAttribute('stroke');
+        let timeAlive = $$('\span.time-alive').getAttribute('stroke');
         let box = GUIUtil.createPopupBox(document.createElement('div'), 300, 150);
         let itemDiv = document.createElement('div');
         itemDiv.className = 'config-item';
         let label = document.createElement('span');
         label.className = 'config-label';
-        label.innerHTML = `You died @ ${this.getPos().join(', ')} because of ${deathReason}<br>Petals: ${this.petalCount.join('/')}<br>Score: ${maxScore}<br>Total Kills: ${totalKills}<br>Time Alive: ${timeAlive}`;
+        label.innerHTML = `You died @ ${this.getPos().join(', ')} because of ${deathReason}<br>Score: ${maxScore}<br>Total Kills: ${totalKills}<br>Time Alive: ${timeAlive}`;
         itemDiv.appendChild(label);
         box.appendChild(itemDiv);
         if(!quitBtn.classList.contains('red')){
@@ -843,18 +905,16 @@ class HornexHack{
             this.setStatus(`${server}: ${status}`);
             let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){
-                btn[i].style.display = this.isEnabled('lockBuildChange') ? 'none' : '';
+                this.setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
             }
             if(!this.ingame) this.trackUI.style.display = 'none';
             if(this.ingame) this.updatePetal();
             this.clearDots();
-            if(this.isEnabled('showRealTimePickup') && !this.isEnabled('RPShowNumberOnly')){
-                this.petalDiv.style.display = '';
-            }else this.petalDiv.style.display = 'none';
+            this.setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup'));
         }, 1000);
     }
     registerChat(){
-        let div = $_('body > div.common > div.chat > div');
+        let div = $$('body > div.common > div.chat > div');
         this.listeners['chat'] = this.listeners['chat'] || new this.MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if(mutation.type == 'childList'){
@@ -887,7 +947,7 @@ class HornexHack{
     }
     registerKey(){
         if(this.listeners['key']) return;
-        let chatbox = $_('body > div.common > div.chat > input');
+        let chatbox = $$('body > div.common > div.chat > input');
         chatbox.onfocus = () => {
             this.chatHistoryIndex = this.chatHistory.length;
         }
@@ -940,7 +1000,7 @@ class HornexHack{
             mob.shinyFlag = 1;
         }
         if(this.trackingType){
-            let minimap = $_('.minimap');
+            let minimap = $$('.minimap');
             if(name.replaceAll(' ', '').includes(this.trackingType)){
                 let dot = document.createElement('div');
                 dot.classList = ['minimap-dot'];
@@ -962,150 +1022,138 @@ class HornexHack{
             this.trackUI.innerHTML = `Not Tracking`;
         }
     }
-    onPickup(petal){
-        if(petal.picked) return;
-        petal.picked = true;
-        let [name, rarity] = this.parseRarity(petal.petal.name);
-        this.petalCount[rarity]++;
-    }
     updatePetal(){
-        let info = 'Petals: ';
-        for(let i = 0; i < 8; i++){
-            info += `<span style="color:${this.rarityColor[i]}">${this.petalCount[i]}</span>/`;
-        }
-        info = info.slice(0, -1);
-        if(this.isEnabled('showRealTimePickup')) this.statusAbove = info;
-        else this.statusAbove = '';
-        if(!this.isEnabled('RPShowNumberOnly')) this.updatePetals();
+        if(this.isEnabled('showRealTimePickup')) this.updatePetals();
     }
-    preparePetalDiv(){
-        this.petalDiv = document.createElement('div');
-        this.petalDiv.classList = ['collected'];
-        this.petalDiv.style.position = 'fixed';
-        this.petalDiv.style.bottom = '1%';
-        this.petalDiv.style.right = '1%';
-        this.petalDiv.style.padding = '10px';
-        this.petalDiv.style.backgroundColor = '#333';
-        this.petalDiv.style.color = 'white';
-        this.petalDiv.style.borderRadius = '8px';
-        this.petalDiv.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
-        this.petalDiv.style.zIndex = '1000';
+    createPetalDiv(){
+        let petalDiv = document.createElement('div');
+        petalDiv.classList = ['collected'];
+        petalDiv.style.position = 'fixed';
+        petalDiv.style.bottom = '1%';
+        petalDiv.style.right = '1%';
+        petalDiv.style.padding = '10px';
+        petalDiv.style.backgroundColor = '#333';
+        petalDiv.style.color = 'white';
+        petalDiv.style.borderRadius = '8px';
+        petalDiv.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+        petalDiv.style.zIndex = '1000';
         let minWidth = 200, minHeight = 150;
-        this.petalDiv.style.width = '200px';
-        this.petalDiv.style.height = '150px';
-        this.petalDiv.style.minWidth = minWidth + 'px';
-        this.petalDiv.style.minHeight = minHeight + 'px';
-        this.petalDiv.style.border = '2px solid rgba(255, 255, 255, 0.2)';
-        this.petalDiv.style.display = 'none';
-        this.collectedRarities = document.createElement('div');
-        this.collectedRarities.classList = ['collected-rarities'];
-        this.collectedRarities.style.fontSize = '15px';
-        this.petalDiv.appendChild(this.collectedRarities);
-        this.collectedPetals = document.createElement('div');
-        this.collectedPetals.classList = ['collected-petals'];
-        this.collectedPetals.style.overflowY = 'auto';
-        this.collectedPetals.style.maxHeight = '400px';
-        this.petalDiv.appendChild(this.collectedPetals);
+        petalDiv.style.width = '200px';
+        petalDiv.style.height = '150px';
+        petalDiv.style.minWidth = minWidth + 'px';
+        petalDiv.style.minHeight = minHeight + 'px';
+        petalDiv.style.border = '2px solid rgba(255, 255, 255, 0.2)';
+        petalDiv.style.display = 'none';
+        let collectedRarities = document.createElement('div');
+        collectedRarities.classList = ['collected-rarities'];
+        collectedRarities.style.fontSize = '15px';
+        petalDiv.appendChild(collectedRarities);
+        let collectedPetals = document.createElement('div');
+        collectedPetals.classList = ['collected-petals'];
+        collectedPetals.style.overflowY = 'auto';
+        collectedPetals.style.maxHeight = '400px';
+        petalDiv.appendChild(collectedPetals);
         let isDragging = false;
         let isResizing = false;
         let resizeDirection = "";
         let offsetX = 0, offsetY = 0;
         let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight, resizeStartLeft, resizeStartTop;
-        this.petalDiv.addEventListener("mousedown", (e) => {
-            const rect = this.petalDiv.getBoundingClientRect();
+        petalDiv.addEventListener("mousedown", (e) => {
+            const rect = petalDiv.getBoundingClientRect();
             if (e.clientX > rect.right - 10 && e.clientY > rect.bottom - 10) {
                 isResizing = true;
                 resizeDirection = "right-bottom";
                 resizeStartX = e.clientX;
                 resizeStartY = e.clientY;
-                resizeStartWidth = parseInt(this.petalDiv.style.width);
-                resizeStartHeight = parseInt(this.petalDiv.style.height);
-                resizeStartLeft = parseInt(this.petalDiv.style.left);
-                resizeStartTop = parseInt(this.petalDiv.style.top);
-                this.petalDiv.style.cursor = "se-resize";
+                resizeStartWidth = parseInt(petalDiv.style.width);
+                resizeStartHeight = parseInt(petalDiv.style.height);
+                resizeStartLeft = parseInt(petalDiv.style.left);
+                resizeStartTop = parseInt(petalDiv.style.top);
+                petalDiv.style.cursor = "se-resize";
             } else if (e.clientX > rect.right - 10) {
                 isResizing = true;
                 resizeDirection = "right";
                 resizeStartX = e.clientX;
-                resizeStartWidth = parseInt(this.petalDiv.style.width);
-                resizeStartLeft = parseInt(this.petalDiv.style.left);
-                this.petalDiv.style.cursor = "e-resize";
+                resizeStartWidth = parseInt(petalDiv.style.width);
+                resizeStartLeft = parseInt(petalDiv.style.left);
+                petalDiv.style.cursor = "e-resize";
             } else if (e.clientY > rect.bottom - 10) {
                 isResizing = true;
                 resizeDirection = "bottom";
                 resizeStartY = e.clientY;
-                resizeStartHeight = parseInt(this.petalDiv.style.height);
-                resizeStartTop = parseInt(this.petalDiv.style.top);
-                this.petalDiv.style.cursor = "s-resize";
+                resizeStartHeight = parseInt(petalDiv.style.height);
+                resizeStartTop = parseInt(petalDiv.style.top);
+                petalDiv.style.cursor = "s-resize";
             } else if (e.clientX < rect.left + 10) {
                 isResizing = true;
                 resizeDirection = "left";
                 resizeStartX = e.clientX;
-                resizeStartWidth = parseInt(this.petalDiv.style.width);
-                resizeStartLeft = parseInt(this.petalDiv.style.left);
-                this.petalDiv.style.cursor = "w-resize";
+                resizeStartWidth = parseInt(petalDiv.style.width);
+                resizeStartLeft = parseInt(petalDiv.style.left);
+                petalDiv.style.cursor = "w-resize";
             } else if (e.clientY < rect.top + 10) {
                 isResizing = true;
                 resizeDirection = "top";
                 resizeStartY = e.clientY;
-                resizeStartHeight = parseInt(this.petalDiv.style.height);
-                resizeStartTop = parseInt(this.petalDiv.style.top);
-                this.petalDiv.style.cursor = "n-resize";
+                resizeStartHeight = parseInt(petalDiv.style.height);
+                resizeStartTop = parseInt(petalDiv.style.top);
+                petalDiv.style.cursor = "n-resize";
             } else {
                 isDragging = true;
-                offsetX = e.clientX - this.petalDiv.offsetLeft;
-                offsetY = e.clientY - this.petalDiv.offsetTop;
-                this.petalDiv.style.cursor = "grabbing";
+                offsetX = e.clientX - petalDiv.offsetLeft;
+                offsetY = e.clientY - petalDiv.offsetTop;
+                petalDiv.style.cursor = "grabbing";
             }
         });
         document.addEventListener("mousemove", (e) => {
             if (isDragging) {
-                this.petalDiv.style.left = e.clientX - offsetX + "px";
-                this.petalDiv.style.top = e.clientY - offsetY + "px";
+                petalDiv.style.left = e.clientX - offsetX + "px";
+                petalDiv.style.top = e.clientY - offsetY + "px";
             } else if (isResizing) {
                 const deltaX = e.clientX - resizeStartX;
                 const deltaY = e.clientY - resizeStartY;
                 if (resizeDirection.includes("right")) {
                     const newWidth = resizeStartWidth + deltaX;
-                    this.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
+                    petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
                 }
                 if (resizeDirection.includes("bottom")) {
                     const newHeight = resizeStartHeight + deltaY;
-                    this.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
+                    petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
                 }
                 if (resizeDirection.includes("left")) {
                     const newWidth = resizeStartWidth - deltaX;
-                    this.petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
-                    this.petalDiv.style.left = resizeStartLeft + deltaX + "px";
+                    petalDiv.style.width = Math.max(newWidth, minWidth) + "px";
+                    petalDiv.style.left = resizeStartLeft + deltaX + "px";
                 }
                 if (resizeDirection.includes("top")) {
                     const newHeight = resizeStartHeight - deltaY;
-                    this.petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
-                    this.petalDiv.style.top = resizeStartTop + deltaY + "px";
+                    petalDiv.style.height = Math.max(newHeight, minHeight) + "px";
+                    petalDiv.style.top = resizeStartTop + deltaY + "px";
                 }
-                const currentHeight = parseInt(this.petalDiv.style.height);
-                this.collectedPetals.style.maxHeight = currentHeight + "px";
+                const currentHeight = parseInt(petalDiv.style.height);
+                collectedPetals.style.maxHeight = currentHeight + "px";
             }
         });
         document.addEventListener("mouseup", () => {
             isDragging = false;
             isResizing = false;
-            this.petalDiv.style.cursor = "move";
+            petalDiv.style.cursor = "move";
         });
-        this.petalDiv.addEventListener("mousemove", (e) => {
-            const rect = this.petalDiv.getBoundingClientRect();
+        petalDiv.addEventListener("mousemove", (e) => {
+            const rect = petalDiv.getBoundingClientRect();
             const isAtRightEdge = e.clientX > rect.right - 10 && e.clientX < rect.right + 10;
             const isAtBottomEdge = e.clientY > rect.bottom - 10 && e.clientY < rect.bottom + 10;
             const isAtLeftEdge = e.clientX > rect.left - 10 && e.clientX < rect.left + 10;
             const isAtTopEdge = e.clientY > rect.top - 10 && e.clientY < rect.top + 10;
-            if (isAtRightEdge && isAtBottomEdge) this.petalDiv.style.cursor = "se-resize";
-            else if (isAtRightEdge) this.petalDiv.style.cursor = "e-resize";
-            else if (isAtBottomEdge) this.petalDiv.style.cursor = "s-resize";
-            else if (isAtLeftEdge) this.petalDiv.style.cursor = "w-resize";
-            else if (isAtTopEdge) this.petalDiv.style.cursor = "n-resize";
-            else this.petalDiv.style.cursor = "move";
+            if (isAtRightEdge && isAtBottomEdge) petalDiv.style.cursor = "se-resize";
+            else if (isAtRightEdge) petalDiv.style.cursor = "e-resize";
+            else if (isAtBottomEdge) petalDiv.style.cursor = "s-resize";
+            else if (isAtLeftEdge) petalDiv.style.cursor = "w-resize";
+            else if (isAtTopEdge) petalDiv.style.cursor = "n-resize";
+            else petalDiv.style.cursor = "move";
         });
-        document.body.appendChild(this.petalDiv);
+        document.body.appendChild(petalDiv);
+        this.petalDiv = petalDiv;
     }
     register(){
         this.MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
@@ -5262,7 +5310,7 @@ function b(c, d) {
     hack.updatePlayerList = jn;
     hack.updatePetals = oE;
     hack.viewProfile = mA;
-    hack.preload();
+    hack.createPetalDiv();
     var h4 = Date[ux(0xa4a)]() < 0x18e9c4b6482,
       h5 = Math[ux(0xa6f)](Math[ux(0xe0d)]() * 0xa);
     function h6(rs) {
@@ -5686,6 +5734,7 @@ function b(c, d) {
     function hY() {
       const vz = ux;
       console[vz(0x8b7)](vz(0x900)), ig();
+      hack.preload();
     }
     var hZ = document[ux(0x546)](ux(0x9a9));
     function i0() {
@@ -12355,7 +12404,7 @@ function b(c, d) {
           this[yl(0xe6a)] && (this[yl(0x839)] += pR / 0xc8),
             this[yl(0x812)] &&
               ((this["x"] = px(this["x"], this[yl(0x812)]["x"], 0xc8)),
-              (this["y"] = px(this["y"], this[yl(0x812)]["y"], 0xc8)), hack.onPickup(this));
+              (this["y"] = px(this["y"], this[yl(0x812)]["y"], 0xc8)))
         }
         [ux(0xaff)](rI) {
           const ym = ux;
@@ -14306,8 +14355,8 @@ function b(c, d) {
     document[ux(0x9d3)] = function (rM) {
       const A3 = ux;
       rM[A3(0x812)] === kj &&
-        ((ng *= rM[A3(0x912)] < 0x0 ? 1.1 : 0.9),
-        (ng = Math[A3(0x585)](0x3, Math[A3(0x9da)](0x1, ng))));
+        ((ng *= rM[A3(0x912)] < 0x0 ? 1.1 : 0.9)
+        )//(ng = Math[A3(0x585)](0x3, Math[A3(0x9da)](0x1, ng))));
     };
     const ni = {};
     (ni[ux(0x235)] = ux(0x202)),
