@@ -32,6 +32,7 @@ class ZcxJamesWaveTable{
         this.tableVisible = true;
         this.previousServer = '';
         this.previousZone = '';
+        this.previousProgress = '';
         this.currentServer = '';
         this.currentZone = '';
         this.progress = '';
@@ -274,9 +275,10 @@ class ZcxJamesWaveTable{
         if (document.hidden) return;
         const waveEndingSpan = $$('span[stroke="Wave Ending..."]');
         if (waveEndingSpan) return;
-        if (this.currentServer !== this.previousServer || this.currentZone !== this.previousZone) {
+        if (this.currentServer !== this.previousServer || this.currentZone !== this.previousZone || this.progress !== this.previousProgress) {
             this.previousServer = this.currentServer;
             this.previousZone = this.currentZone;
+            this.previousProgress = this.progress;
             return;
         }
         const data = { server: this.currentServer, zone: this.currentZone, progress: this.progress };
@@ -284,10 +286,11 @@ class ZcxJamesWaveTable{
             this.xmlhttpRequest({
                 method: "POST",
                 url: "https://zcxjames.top:5001",
-                data: JSON.stringify(data),
+                data: data,
                 headers: { "Content-Type": "application/json" }
             });
         }
+        this.previousProgress = this.progress;
     }
 }
 class HornexHack{
@@ -447,6 +450,7 @@ class HornexHack{
         if(!txt.value) txt.value = this.LS_get('player_id');
         $$('body > div.common > div.msg-overlay > div > div.export-row > div').addEventListener('click', () => {
             let value = txt.value.trim();
+            if(!(value.length == 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value))) return;
             if(!this.altList.includes(value)) this.altList.push(value);
             this.updateAlt();
         })
@@ -466,8 +470,8 @@ class HornexHack{
         $$('body > div.common > div.msg-overlay > div').appendChild(div);
     }
     addTableRow(account){
-        $('altBody').innerHTML += `<tr onclick="` + `document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > input.textbox').value = '${account}'` + `">
-        <td>${account}</td><td class="align-right"><button id="` + `${account}` + `">Delete</button></td>
+        $('altBody').innerHTML += `<tr>
+        <td onclick="` + `document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > input.textbox').value = '${account}'` + `;document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > div').click()">${account}</td><td class="delete-button"><button id="` + `${account}` + `">Delete</button></td>
         </tr>`;
     }
     updateAlt(){
@@ -475,7 +479,7 @@ class HornexHack{
         this.altList.forEach(account => {
             this.addTableRow(account);
         });
-        $_('.align-right > button').forEach(node => {
+        $_('.delete-button').forEach(node => {
             const account = node.id;
             node.addEventListener('click', () => {
                 this.altList = this.altList.filter(i => i != account);
@@ -765,7 +769,7 @@ class HornexHack{
         }
     }
     clickPlay(time){
-        setTimeout(() => {$_('.play-btn').click()}, 1000 * time);
+        setTimeout(() => {$$('.play-btn').click()}, 1000 * time);
     }
     changeServer(server){
         $_('.btn')[13 + parseInt(server)].click();
@@ -910,7 +914,7 @@ class HornexHack{
             if(!this.ingame) this.trackUI.style.display = 'none';
             if(this.ingame) this.updatePetal();
             this.clearDots();
-            this.setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup'));
+            this.setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childList);
         }, 1000);
     }
     registerChat(){
