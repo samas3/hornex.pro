@@ -186,6 +186,9 @@ input:checked + .slider:before {
 .video{
     display: none;
 }
+.dialog-content.table{
+    grid-template-columns: auto auto auto;
+}
 /* ZcxJames' script */
 #jsonDataTable{
     position: fixed;

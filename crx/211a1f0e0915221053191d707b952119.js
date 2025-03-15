@@ -29,7 +29,6 @@ class ZcxJamesWaveTable{
     constructor(){
         this.scriptVersion = '3.0';
         this.regions = ['as1', 'as2', 'eu1', 'eu2', 'us1', 'us2'];
-        this.tableVisible = true;
         this.previousServer = '';
         this.previousZone = '';
         this.previousProgress = '';
@@ -140,13 +139,14 @@ class ZcxJamesWaveTable{
         this.table = table;
     }
     start(){
-        document.addEventListener('keydown', (evt) => this.toggleTableVisibility(evt));
         this.createModalOverlay();
         this.createTable();
+        hack.setVisibility(this.table, hack.isEnabled('showWaveTable'));
         setInterval(() => {
             this.fetchAndUpdateTable();
             this.sendPost();
             this.updateData();
+            hack.setVisibility(this.table, hack.isEnabled('showWaveTable'));
         }, 1000);
     }
     xmlhttpRequest(options){
@@ -175,10 +175,6 @@ class ZcxJamesWaveTable{
     updateTable(jsonData) {
         if(!this.table) return;
         const columnCount = this.showZone.reduce((cnt, i) => cnt + i, 0);
-        if (columnCount === 0) {
-            this.tableVisible = false;
-            return;
-        }
         const tableWidth = columnCount * 75 + 50;
         this.table.style.width = `${tableWidth}px`;
         $('thUltra').style.display = this.showZone[0] ? 'table-cell' : 'none';
@@ -187,7 +183,6 @@ class ZcxJamesWaveTable{
         Object.entries(jsonData).forEach(([region, data]) => {
             this.updateCell(region, data);
         })
-        this.table.style.display = this.tableVisible ? 'table' : 'none';
     }
     updateCell(key, data) {
         const timeValue = data.status;
@@ -228,7 +223,7 @@ class ZcxJamesWaveTable{
     fetchAndUpdateTable() {
         this.xmlhttpRequest({
             method: 'GET',
-            url: 'https://zcxjames.top/evilcat.json',
+            url: 'https://zcxjames.top/asdjkla.json',
             onload: response => {
                 this.updateTable(JSON.parse(response.responseText));
             },
@@ -236,22 +231,6 @@ class ZcxJamesWaveTable{
                 console.log(error)
             }
         });
-    }
-    toggleTableVisibility(event) {
-        if (event.key === 'Tab') {
-            event.preventDefault();
-            if (!this.showZone.reduce((cnt, i) => cnt + i, 0)) {
-                this.showZone = [false, true, true];
-                localStorage.setItem('showUltra', JSON.stringify(this.showZone[0]));
-                localStorage.setItem('showSuper', JSON.stringify(this.showZone[1]));
-                localStorage.setItem('showHyper', JSON.stringify(this.showZone[2]));
-                this.fetchAndUpdateTable();
-                this.tableVisible = true;
-            } else {
-                this.tableVisible = !this.tableVisible;
-            }
-            if (this.table) this.table.style.display = this.tableVisible ? 'table' : 'none';
-        }
     }
     updateData() {
         this.currentServer = Object.keys(this.servers).find(server =>
@@ -281,13 +260,13 @@ class ZcxJamesWaveTable{
             this.previousProgress = this.progress;
             return;
         }
-        const data = { server: this.currentServer, zone: this.currentZone, progress: this.progress };
+        const data = { server: this.currentServer, zone: this.currentZone, progress: this.progress, type: 'wave', profile: hack.player.name };
         if(this.currentZone && ['Ultra', 'Super', 'Hyper'].includes(this.currentZone)) {
             this.xmlhttpRequest({
                 method: "POST",
                 url: "https://zcxjames.top:5001",
                 data: data,
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json" },
             });
         }
         this.previousProgress = this.progress;
@@ -311,7 +290,8 @@ class HornexHack{
             allowInvalidCommand: false, // 允许聊天输入无效指令
             shinyAlert: true, // 显示shiny警报
             showRealTimePickup: true, // 显示实时拾取掉落物
-            zcxJamesScript: true, // ZcxJames脚本适配
+            showWaveTable: true, // 是否显示wave表格
+            extendedZoom: true, // 无限缩放
         };
         this.configKeys = Object.keys(this.default);
         this.chatFunc = null;
@@ -652,9 +632,7 @@ class HornexHack{
         this.loadStatus();
         this.setStatus('');
         this.loadModule();
-        if(this.isEnabled('zcxJamesScript')){
-            this.table.start();
-        }
+        this.table.start();
         this.modifyDOM();
         let checkDOM = setInterval(() => {
             if($$('div[stroke="You will also be logged out of Discord if you are logged in."]')){
@@ -914,7 +892,7 @@ class HornexHack{
             if(!this.ingame) this.trackUI.style.display = 'none';
             if(this.ingame) this.updatePetal();
             this.clearDots();
-            this.setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childList);
+            this.setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childNodes.length);
         }, 1000);
     }
     registerChat(){
@@ -987,7 +965,7 @@ class HornexHack{
             this.players[player.username] = player.nick;
             let list = Object.entries(this.players).filter(x => x[0] != 'undefined');
             list.forEach((item, index) => {
-                list[index] = [item[1] || '<nameless>', '', item[0]];
+                list[index] = [item[1] || '<nameless>', item[0]];
             });
             this.updatePlayerList(list);
         }
@@ -6780,7 +6758,7 @@ function b(c, d) {
       }
       m3[wc(0x519)][wc(0x695)]();*/
     ji.style.display = "";
-    jj.innerHTML = "<div><span stroke=\"#\"></span></div>\n\t\t<div><span stroke=\"Nickname\"></span></div>\n\t\t<div><span stroke=\"别点这列会被踢\"></span></div>\n\t\t<div><span stroke=\"Account ID\"></span></div>";
+    jj.innerHTML = "<div><span stroke=\"#\"></span></div>\n\t\t<div><span stroke=\"Nickname\"></span></div>\n\t\t<div style=\"display:none\"><span></span></div>\n\t\t<div><span stroke=\"Account ID\"></span></div>";
     const rD = rC.length;
     jk = [];
     for (let rE = 0x0; rE < rD; rE++) {
@@ -14358,9 +14336,10 @@ function b(c, d) {
       nh = 0x1;
     document[ux(0x9d3)] = function (rM) {
       const A3 = ux;
-      rM[A3(0x812)] === kj &&
-        ((ng *= rM[A3(0x912)] < 0x0 ? 1.1 : 0.9)
-        )//(ng = Math[A3(0x585)](0x3, Math[A3(0x9da)](0x1, ng))));
+      if(rM[A3(0x812)] === kj){
+        ng *= rM[A3(0x912)] < 0x0 ? 1.1 : 0.9;
+        if(!hack.isEnabled('extendedZoom')) ng = Math[A3(0x585)](0x3, Math[A3(0x9da)](0x1, ng));
+      }
     };
     const ni = {};
     (ni[ux(0x235)] = ux(0x202)),
