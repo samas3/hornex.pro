@@ -418,6 +418,13 @@ class HornexHack{
         this.setVisibility($$('.export-btn'), false);
         this.setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > span'), 'Account Manager');
         this.setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > div > span'), 'Manage your accounts, modified by samas3');
+
+        // Build Export/Import
+        let exportBtn = `<div class="btn" id="exportBuild">Export Build</div>`;
+        let importBtn = `<div class="btn" id="importBuild">Import Build</div>`;
+        $$('.builds').childNodes[1].innerHTML += exportBtn + importBtn;
+        $('exportBuild').onclick = () => this.exportBuilds();
+        $('importBuild').onclick = () => this.importBuilds();
     }
     modifyImport(){
         this.setStroke($$('body > div.common > div.msg-overlay > div > div.msg-title'), 'Account Manager');
@@ -451,7 +458,7 @@ class HornexHack{
     }
     addTableRow(account){
         $('altBody').innerHTML += `<tr>
-        <td onclick="` + `document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > input.textbox').value = '${account}'` + `;document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > div').click()">${account}</td><td class="delete-button"><button id="` + `${account}` + `">Delete</button></td>
+        <td onclick="` + `document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > input.textbox').value = '${account}'` + `;document.querySelector('body > div.common > div.msg-overlay > div > div.export-row > div').click()">${account}</td><td class="delete-button" id="` + `${account}` + `"><button>Delete</button></td>
         </tr>`;
     }
     updateAlt(){
@@ -626,6 +633,19 @@ class HornexHack{
         if(element){
             element.style.display = visible ? '' : 'none';
         }
+    }
+    async writeClipboard(content){
+        let clip = navigator.clipboard;
+        if(clip){
+            await clip.writeText(content);
+        }
+    }
+    async readClipboard(){
+        let clip = navigator.clipboard;
+        if(clip){
+            return await clip.readText();
+        }
+        return null;
     }
     // ----- Command -----
     preload(){
@@ -816,6 +836,24 @@ class HornexHack{
             this.addChat(`Total damage: ${this.damageSum} in ${time / 1000} seconds`, '#0ff');
             this.addChat(`DPS: ${Math.round(this.damageSum / (time / 1000))}`, '#0ff');
         }
+    }
+    exportBuilds(){
+        let builds = this.LS_get('saved_builds');
+        let str = btoa(JSON.stringify(builds));
+        this.writeClipboard(str);
+        alert('Exported builds to clipboard');
+    }
+    importBuilds(){
+        let str;
+        try{
+            // str = JSON.parse(atob(this.readClipboard()));
+            str = JSON.parse(atob(prompt('Paste your builds here')));
+        }catch(e){
+            alert('Invalid data: ' + e.message);
+            return;
+        }
+        this.LS_set('saved_builds', JSON.stringify(str));
+        alert('Imported builds from clipboard, refresh to view changes');
     }
     commandMultiArg(func, num, args){
         args = args.split(' ');
