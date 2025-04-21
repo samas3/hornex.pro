@@ -280,3 +280,28 @@ input:checked + .slider:before {
 .delete-button {
     text-align: right;
 }
+.input-field {
+    position: relative;
+    margin: 12px 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.input-element {
+    width: 100%;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.95em;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.input-element:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+    background: rgba(255,255,255,0.08);
+}
+.input-element:hover {
+    border-color: rgba(255,255,255,0.2);
+}

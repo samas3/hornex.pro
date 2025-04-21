@@ -1,304 +1,13 @@
-const $ = (i) => document.getElementById.bind(document)(i);
-const $$ = (i) => document.querySelector.bind(document)(i);
-const $_ = (i) => document.querySelectorAll.bind(document)(i);
-const GUIUtil = {
-    createPopupBox: function(elem, w, h){
-        let box = document.createElement('div');
-        box.className = 'p-box';
-        box.style.width = w + 'px';
-        box.style.height = h + 'px';
-        let close = document.createElement('div');
-        close.className = 'p-close';
-        close.innerHTML = '×';
-        close.onclick = () => document.body.removeChild(box);
-        box.appendChild(close);
-        box.appendChild(elem);
-        document.body.appendChild(box);
-        return box;
-    },
-    createInfoBox: function(){
-        let div = document.createElement('div');
-        div.style.position = 'fixed';
-        div.style.padding = '10px';
-        div.style.zIndex = '1';
-        document.body.appendChild(div);
-        return div;
-    }
-}
-class ZcxJamesWaveTable{
-    constructor(){
-        this.scriptVersion = '3.0';
-        this.regions = ['as1', 'as2', 'eu1', 'eu2', 'us1', 'us2'];
-        this.previousServer = '';
-        this.previousZone = '';
-        this.previousProgress = '';
-        this.currentServer = '';
-        this.currentZone = '';
-        this.progress = '';
-        this.showZone = [JSON.parse(localStorage.getItem('showUltra')) ?? false,
-            JSON.parse(localStorage.getItem('showSuper')) ?? true,
-            JSON.parse(localStorage.getItem('showHyper')) ?? true]
-        this.servers = {
-            'eu1': 'rgb(166, 56, 237)', 'eu2': 'rgb(81, 121, 251)', 'as1': 'rgb(237, 61, 234)', 'us1': 'rgb(219, 130, 41)', 'us2': 'rgb(237, 236, 61)', 'as2': 'rgb(61, 179, 203)'
-        };
-        this.zones = {
-            Ultra: 'rgb(255, 43, 117)', Super: 'rgb(43, 255, 163)', Hyper: 'rgb(92, 116, 176)', Waveroom: 'rgb(126, 239, 109)'
-        };
-        this.modalOverlay = null;
-        this.table = null;
-    }
-    createModalOverlay() {
-        if($('modalOverlay')) return;
-        const modalOverlay = document.createElement('div');
-        modalOverlay.id = 'modalOverlay';
-        const modalContent = document.createElement('div');
-        modalContent.id ='modalContent';
-        const infoSidebar = document.createElement('div');
-        infoSidebar.id = 'infoSidebar';
-        infoSidebar.innerHTML = `
-            <h3>settings</h3>
-            <label><input type="checkbox" id="showUltra" ${this.showZone[0] ? 'checked' : ''}> Ultra</label><br>
-            <label><input type="checkbox" id="showSuper" ${this.showZone[1] ? 'checked' : ''}> Super</label><br>
-            <label><input type="checkbox" id="showHyper" ${this.showZone[2] ? 'checked' : ''}> Hyper</label><br>
-            <hr>
-            <h3>information</h3>
-            <button id="loadInfo">show full introduction</button>
-            <div id="infoContent" style="margin-top: 10px;"></div>
-        `;
-        modalContent.appendChild(infoSidebar);
-        const infoArea = document.createElement('div');
-        infoArea.id = 'infoArea';
-        infoArea.classList = 'infoArea1';
-        infoArea.innerHTML = `
-            <h2>About ZcxJames' hornex wave script</h2>
-            <p id="info">author:ZcxJames<br>
-            version: ${this.scriptVersion}<br>
-            Script homepage: <a href="https://zcxjames.top/zcxjames_hornex_wave_script/" target="_blank">zcxjames.top/zcxjames_hornex_wave_script/</a></p>
-            <button id="closeModalBtn">close</button>
-        `;
-        modalContent.appendChild(infoArea);
-        modalOverlay.appendChild(modalContent);
-        this.showinfo1 = () => this.loadScriptInfo();
-        this.showinfo2 = () => {
-            $('info').innerHTML = `author:ZcxJames<br>
-            version: ${this.scriptVersion}<br>
-            Script homepage: <a href="https://zcxjames.top/zcxjames_hornex_wave_script/" target="_blank">zcxjames.top/zcxjames_hornex_wave_script/</a>`;
-            $('loadInfo').innerHTML = 'show full introduction';
-            infoArea.classList = 'infoArea1';
-            $('loadInfo').removeEventListener('click', this.showinfo2);
-            $('loadInfo').addEventListener('click', this.showinfo1);
-        }
-        this.onchangeU = (event) => {
-            this.showZone[0] = event.target.checked;
-            localStorage.setItem('showUltra', JSON.stringify(this.showZone[0]));
-            this.fetchAndUpdateTable();
-        };
-        this.onchangeS = (event) => {
-            this.showZone[1] = event.target.checked;
-            localStorage.setItem('showSuper', JSON.stringify(this.showZone[1]));
-            this.fetchAndUpdateTable();
-        };
-        this.onchangeH = (event) => {
-            this.showZone[2] = event.target.checked;
-            localStorage.setItem('showHyper', JSON.stringify(this.showZone[2]));
-            this.fetchAndUpdateTable();
-        };
-        this.onclose = () => {
-            $('loadInfo').removeEventListener('click', this.showinfo1);
-            $('showUltra').removeEventListener('change', this.onchangeU);
-            $('showSuper').removeEventListener('change', this.onchangeS);
-            $('showHyper').removeEventListener('change', this.onchangeH);
-            $('closeModalBtn').removeEventListener('click', this.onclose);
-            modalOverlay.remove();
-        };
-        this.modalOverlay = modalOverlay;
-    }
-    createTable(){
-        if($('jsonDataTable')) return;
-        const table = document.createElement('table');
-        table.id = 'jsonDataTable';
-        table.innerHTML = `
-            <thead>
-                <tr><th class="jsonTableCell"></th>
-                    <th class="jsonTableCell" id="thUltra">Ultra</th>
-                    <th class="jsonTableCell" id="thSuper">Super</th>
-                    <th class="jsonTableCell" id="thHyper">Hyper</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${this.regions.map(region => `
-                    <tr id="tr${region}">
-                        <td class="jsonTableCell">${region}</td>
-                        <td class="jsonTableCell" id="${region}_Ultra">N/A</td>
-                        <td class="jsonTableCell" id="${region}_Super">N/A</td>
-                        <td class="jsonTableCell" id="${region}_Hyper">N/A</td>
-                    </tr>`).join('')}
-            </tbody>`;
-        table.addEventListener('click', () => this.showModal());
-        document.body.appendChild(table);
-        this.table = table;
-    }
-    start(){
-        this.createModalOverlay();
-        this.createTable();
-        hack.setVisibility(this.table, hack.isEnabled('showWaveTable'));
-        setInterval(() => {
-            this.fetchAndUpdateTable();
-            this.sendPost();
-            this.updateData();
-            hack.setVisibility(this.table, hack.isEnabled('showWaveTable'));
-        }, 1000);
-    }
-    xmlhttpRequest(options){
-        var fetchOptions = {
-            method: options.method,
-            headers: options.headers || {},
-            body: options.data ? JSON.stringify(options.data) : null
-        };
-        fetch(options.url, fetchOptions)
-            .then(response => {
-                if (response.ok) {
-                    return response.text();
-                }
-            })
-            .then(data => {
-                if (options.onload) {
-                    options.onload({ responseText: data });
-                }
-            })
-            .catch(error => {
-                if (options.onerror) {
-                    options.onerror({ statusText: error.message });
-                }
-            });
-    }
-    updateTable(jsonData) {
-        if(!this.table) return;
-        const columnCount = this.showZone.reduce((cnt, i) => cnt + i, 0);
-        const tableWidth = columnCount * 75 + 50;
-        this.table.style.width = `${tableWidth}px`;
-        $('thUltra').style.display = this.showZone[0] ? 'table-cell' : 'none';
-        $('thSuper').style.display = this.showZone[1] ? 'table-cell' : 'none';
-        $('thHyper').style.display = this.showZone[2] ? 'table-cell' : 'none';
-        Object.entries(jsonData).forEach(([region, data]) => {
-            this.updateCell(region, data);
-        })
-    }
-    updateCell(key, data) {
-        const timeValue = data.status;
-        const progress = data.progress || 'N/A';
-        let cell = $(key);
-        if(!this.showZone[0] && key.includes('Ultra') || !this.showZone[1] && key.includes('Super') || !this.showZone[2] && key.includes('Hyper')){
-            cell.style.display = 'none';
-            return;
-        }
-        if(this.showZone[0] && key.includes('Ultra') || this.showZone[1] && key.includes('Super') || this.showZone[2] && key.includes('Hyper')){
-            cell.style.display = 'table-cell';
-        }
-        cell.innerHTML = progress;
-        cell.style.color = timeValue ? 'orange' : 'black';
-    }
-    showModal() {
-        if ($('modalOverlay')) return;
-        document.body.appendChild(this.modalOverlay);
-        $('loadInfo').addEventListener('click', this.showinfo1);
-        $('showUltra').addEventListener('change', this.onchangeU);
-        $('showSuper').addEventListener('change', this.onchangeS);
-        $('showHyper').addEventListener('change', this.onchangeH);
-        $('closeModalBtn').addEventListener('click', this.onclose);
-    }
-    loadScriptInfo() {
-        this.xmlhttpRequest({
-            method: 'GET',
-            url: 'https://zcxjames.top/script_info.txt',
-            onload: response => {
-                $('infoArea').classList = 'infoArea2';
-                $('info').innerHTML = response.responseText;
-                $('loadInfo').innerHTML = 'show brief introduction';
-                $('loadInfo').removeEventListener('click', this.showinfo1);
-                $('loadInfo').addEventListener('click', this.showinfo2);
-            }
-        });
-    }
-    fetchAndUpdateTable() {
-        this.xmlhttpRequest({
-            method: 'GET',
-            url: 'https://zcxjames.top/asdjkla.json',
-            onload: response => {
-                this.updateTable(JSON.parse(response.responseText));
-            },
-            onerror: error => {
-                console.log(error)
-            }
-        });
-    }
-    updateData() {
-        this.currentServer = Object.keys(this.servers).find(server =>
-            $$(`div.btn.active[style="background-color: ${this.servers[server]};"]`)) || '';
-        this.currentZone = Object.keys(this.zones).find(zone =>
-            $$(`div.zone-name[stroke="${zone}"]`)) || '';
-        if ($$('div.zone-name[stroke="Waveroom"]')) this.currentZone = 'waveroom';
-        const waveSpan = $$('body > div.hud > div.zone > div.progress > span[stroke]');
-        const waveText = waveSpan ? waveSpan.getAttribute('stroke') : '';
-        const waveMatch = waveText.match(/Wave (\d+)/i);
-        this.progress = waveMatch ? 'Wave ' + waveMatch[1] : '0%';
-        $_('div.bar').forEach(bar => {
-            const matches = bar.style.transform.match(/translate\(calc\(-(\d+(\.\d+)?)% \+ \d+(\.\d+)?em\), 0px\)/);
-            if (matches && matches[1]) {
-                const tempProgress = (100 - parseFloat(matches[1])).toFixed(4);
-                if (parseFloat(tempProgress) > parseFloat(this.progress)) this.progress = tempProgress + '%';
-            }
-        });
-    }
-    sendPost() {
-        if (document.hidden) return;
-        const waveEndingSpan = $$('span[stroke="Wave Ending..."]');
-        if (waveEndingSpan) return;
-        if (this.currentServer !== this.previousServer || this.currentZone !== this.previousZone || this.progress !== this.previousProgress) {
-            this.previousServer = this.currentServer;
-            this.previousZone = this.currentZone;
-            this.previousProgress = this.progress;
-            return;
-        }
-        const data = { server: this.currentServer, zone: this.currentZone, progress: this.progress, type: 'wave', profile: hack.player.name };
-        if(this.currentZone && ['Ultra', 'Super', 'Hyper'].includes(this.currentZone)) {
-            this.xmlhttpRequest({
-                method: "POST",
-                url: "https://zcxjames.top:5001",
-                data: data,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-        this.previousProgress = this.progress;
-    }
-}
+import { GUIUtil, ZcxJamesWaveTable, $, $$, $_, ConfigManager, setStroke, setVisibility, writeClipboard, BindsManager } from "./util.js";
 class HornexHack{
     constructor(){
-        //this.version = '3.0';
-        this.config = {};
-        this.default = {
-            damageDisplay: true, // 伤害显示修改
-            DDenableNumber: true, // 显示伤害数值而不是百分比（若可用）
-            healthDisplay: true, // 血量显示
-            disableChatCheck: true, // 是否禁用聊天内容检查
-            autoRespawn: true, // 自动重生
-            //colorText: false, // 公告彩字
-            numberNoSuffix: true, // 取消数字单位显示
-            lockBuildChange: false, // 禁止更改Build
-            //forceLoadScript: false, // 在脚本报错后自动刷新
-            autoClickPlay: true, // 重生后自动点击Play
-            allowInvalidCommand: false, // 允许聊天输入无效指令
-            shinyAlert: true, // 显示shiny警报
-            showRealTimePickup: true, // 显示实时拾取掉落物
-            showWaveTable: true, // 是否显示wave表格
-            extendedZoom: true, // 无限缩放
-        };
-        this.configKeys = Object.keys(this.default);
+        this.version = '3.0';
+        this.configManager = new ConfigManager(this);
         this.chatFunc = null;
         this.toastFunc = null;
         this.numFunc = null;
         this.mobFunc = null;
-        this.moblst = null;
+        this.mobList = null;
         this.rarityColor = [
             '#7eef6d',
             '#ffe65d',
@@ -317,14 +26,14 @@ class HornexHack{
             '/dlMob <mob>': '<internal> download an image of a specific mob',
             '/dlPetal <petal>': '<internal> download an image of a specific petal',
             '/dlSprite': '<internal> download all images used in the game',
-            '/toggle <module>': 'toggle a specific module',
+            //'/toggle <module>': 'toggle a specific module',
             '/list': 'lists all the modules and configs',
             '/help': 'show this help',
-            '/bind <module> <key>': 'bind a module to the specific key',
-            '/bind <module> clear': 'clear a module\'s keybind',
+            //'/bind <module> <key>': 'bind a module to the specific key',
+            //'/bind <module> clear': 'clear a module\'s keybind',
             '/open': 'open the config gui',
             '/delBuild <id>': 'delete a build',
-            '/viewPetal <id>': 'view a petal(add it into Build #49)',
+            '/viewPetal <id>': 'view a petal(add it to a popup box)',
             '/viewMob <id>': 'view a mob(add it to zone mobs)',
             '/track <id/"stop">': 'track a mob',
             //'/change <server>': 'change server(0=eu1 1=eu2 2=as1 3=us1 4=us2 5=as2, need autoRespawn enabled)',
@@ -340,28 +49,14 @@ class HornexHack{
         this.tracking = null;
         this.petalCount = [0, 0, 0, 0, 0, 0, 0, 0];
         this.isSuicide = false;
-        this.bindKeys = {};
-        this.triggers = {
-            'openGUI': () => this.openGUI(),
-            'sendCoords': () => {
-                let coords = this.getPos();
-                if(this.speak) this.speak(`Current coords: ${coords.join(', ')}`);
-                else{
-                    this.addChat('You need to send something into chat to enable this!', '#ff7f50');
-                }
-            },
-            'toggleTrack': () => {
-                this.setVisibility(this.trackUI, this.trackUI.style.display);
-            },
-            'changeServer': () => this.changeGUI(),
-        };
-        this.triggerKeys = Object.keys(this.triggers);
-        this.table = new ZcxJamesWaveTable();
+        this.bindsManager = new BindsManager(this);
+        this.table = new ZcxJamesWaveTable(this);
         this.chatHistory = [];
         this.chatHistoryIndex = 0;
         this.listeners = {};
         this.intervals = {};
         this.altList = [];
+        this.pushPetals = [];
     }
     // ----- Notice -----
     addChat(text, color='#ff00ff'){
@@ -411,25 +106,25 @@ class HornexHack{
         this.trackUI = div;
     }
     modifyDOM(){
-        this.setVisibility($$('.player-list-btn'), true);
+        setVisibility($$('.player-list-btn'), true);
         $$('.censor-cb').checked = false;
-        this.setStroke($$('body > div.common > div.dialog.player-list > label > span'), 'Enable Copy');
-        this.setStroke($$('body > div.common > div.dialog.player-list > div.player-list-info'), 'Checked=Copy, Unchecked=View Profile');
-        this.setVisibility($$('.export-btn'), false);
-        this.setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > span'), 'Account Manager');
-        this.setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > div > span'), 'Manage your accounts, modified by samas3');
+        setStroke($$('body > div.common > div.dialog.player-list > label > span'), 'Enable Copy');
+        setStroke($$('body > div.common > div.dialog.player-list > div.player-list-info'), 'Checked=Copy, Unchecked=View Profile');
+        setVisibility($$('.export-btn'), false);
+        setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > span'), 'Account Manager');
+        setStroke($$('body > div.menu > div.btn-group.top.right.dc-group > div.id-group > div.btn.import-btn > div > span'), 'Manage your accounts, modified by samas3');
 
         // Build Export/Import
         let exportBtn = `<div class="btn" id="exportBuild">Export Build</div>`;
         let importBtn = `<div class="btn" id="importBuild">Import Build</div>`;
-        $$('.builds').childNodes[1].innerHTML += exportBtn + importBtn;
+        if(!$('exportBuild')) $$('.builds').childNodes[1].innerHTML += exportBtn + importBtn;
         $('exportBuild').onclick = () => this.exportBuilds();
         $('importBuild').onclick = () => this.importBuilds();
     }
     modifyImport(){
-        this.setStroke($$('body > div.common > div.msg-overlay > div > div.msg-title'), 'Account Manager');
-        this.setStroke($$('body > div.common > div.msg-overlay > div > div:nth-child(2)'), '');
-        this.setStroke($$('body > div.common > div.msg-overlay > div > div:nth-child(4)'), '');
+        setStroke($$('body > div.common > div.msg-overlay > div > div.msg-title'), 'Account Manager');
+        setStroke($$('body > div.common > div.msg-overlay > div > div:nth-child(2)'), '');
+        setStroke($$('body > div.common > div.msg-overlay > div > div:nth-child(4)'), '');
         this.altList = this.LS_get('accounts') || [];
         this.createAltTable();
         this.updateAlt();
@@ -476,38 +171,32 @@ class HornexHack{
         this.LS_set('accounts', JSON.stringify(this.altList));
     }
     // ----- Module -----
-    hasModule(module){
-        return this.configKeys.includes(module);
-    }
     isEnabled(module){
-        return this.hasModule(module) && this.config[module];
-    }
-    setEnabled(module, status){
-        if(this.hasModule(module)){
-            this.config[module] = status;
-        }else{
-            this.addChat(`Module or config not found: ${module}`, '#ff7f50');
-        }
+        return this.configManager.get(module).get();
     }
     toggle(module){
-        if(this.hasModule(module)){
-            this.config[module] = !this.isEnabled(module);
-            this.addChat(`Toggled module ${module} to ${this.config[module]}`);
+        if(this.configManager.get(module).type == 'boolean'){
+            this.configManager.get(module).toggle();
         }else{
             this.addChat(`Module or config not found: ${module}`, '#ff7f50');
         }
         this.saveModule();
     }
     listModule(){
-        this.configKeys.forEach(item => {
+        this.configManager.list().forEach(item => {
             this.addChat(`${item}: ${this.isEnabled(item)} (defaults to ${this.default[item]})`, '#ffffff');
         });
     }
     createBadge(item) {
+        if(!this.bindsManager.list().includes(item)) return document.createElement('div');
         let statusBadge = document.createElement('span');
-        statusBadge.className = `badge ${this.bindKeys[item] ? 'badge-binded' : 'badge-unbinded'}`;
-        statusBadge.textContent = Object.keys(this.bindKeys).includes(item) ? 
-            `Binded to ${this.bindKeys[item]}` : 'Not binded';
+        if(this.bindsManager.get(item)){
+            statusBadge.className = 'badge badge-binded';
+            statusBadge.textContent = `Binded to ${this.bindsManager.get(item)}`;
+        }else{
+            statusBadge.className = 'badge badge-unbinded';
+            statusBadge.textContent = 'Not binded';
+        }
         statusBadge.addEventListener('click', (e) => {
             e.stopPropagation();
             this.startKeyBinding(item, statusBadge);
@@ -519,7 +208,7 @@ class HornexHack{
         badgeElement.textContent = 'Press a key to bind...'
         const keyHandler = (e) => {
             if (e.key === 'Escape') {
-                this.bindKey(item, 'clear')
+                this.bindsManager.set(item, null);
                 document.removeEventListener('keydown', keyHandler);
                 badgeElement.className = 'badge badge-unbinded';
                 badgeElement.textContent = `Not binded`;
@@ -528,69 +217,12 @@ class HornexHack{
             if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
                 return;
             }
-            this.bindKey(item, e.key);
-            badgeElement.textContent = `Binded to ${this.bindKeys[item]}`;
+            this.bindsManager.set(item, e.key);
+            badgeElement.textContent = `Binded to ${this.bindsManager.get(item)}`;
             badgeElement.className = 'badge badge-binded';
             document.removeEventListener('keydown', keyHandler);
         };
         document.addEventListener('keydown', keyHandler);
-    }
-    openGUI(){
-        let main = document.createElement('div');
-        let header = document.createElement('div');
-        header.className = 'p-header';
-        header.innerHTML = `
-            <div class="p-title">Settings</div>
-        `;
-        main.appendChild(header);
-        this.configKeys.forEach(item => {
-            let itemDiv = document.createElement('div');
-            itemDiv.className = 'config-item';
-            let label = document.createElement('span');
-            label.className = 'config-label';
-            label.innerHTML = item;
-            let statusBadge = this.createBadge(item);
-            label.appendChild(statusBadge);
-            itemDiv.appendChild(label);
-            let switchLabel = document.createElement('label');
-            switchLabel.className = 'switch';
-            let checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = this.isEnabled(item);
-            checkbox.onclick = () => this.toggle(item);
-            let slider = document.createElement('span');
-            slider.className = 'slider';
-            switchLabel.appendChild(checkbox);
-            switchLabel.appendChild(slider);
-            itemDiv.appendChild(switchLabel);
-            main.appendChild(itemDiv);
-        });
-        this.triggerKeys.forEach(item => {
-            let itemDiv = document.createElement('div');
-            itemDiv.className = 'config-item';
-            let label = document.createElement('span');
-            label.className = 'config-label';
-            label.textContent = item;
-            let statusBadge = this.createBadge(item);
-            label.appendChild(statusBadge);
-            itemDiv.appendChild(label);
-            main.appendChild(itemDiv);
-        });
-        const itemHeight = 48;
-        const headerHeight = 54;
-        const totalHeight = headerHeight + (this.configKeys.length + this.triggerKeys.length) * itemHeight;
-        return GUIUtil.createPopupBox(main, 400, totalHeight);
-    }
-    bindKey(module, key){
-        if(key == 'clear'){
-            delete this.bindKeys[module];
-            this.addChat(`Cleared keybind of ${module}`);
-            this.saveModule();
-            return;
-        }
-        this.bindKeys[module] = key;
-        this.addChat(`Set keybind of ${module} to ${key}`);
-        this.saveModule();
     }
     LS_set(key, value){
         localStorage.setItem(key, value);
@@ -603,49 +235,12 @@ class HornexHack{
         }
     }
     saveModule(){
-        this.LS_set('hhConfig', JSON.stringify(this.config));
-        this.LS_set('hhKeys', JSON.stringify(this.bindKeys));
+        this.configManager.save();
+        this.bindsManager.save();
     }
     loadModule(){
-        let cfg = this.LS_get('hhConfig');
-        let keys = this.LS_get('hhKeys') || {};
-        if(!cfg){
-            this.config = this.default;
-            this.saveModule();
-            return;
-        }
-        this.configKeys.forEach(item => {
-            if(!Object.keys(cfg).includes(item)){
-                this.config[item] = this.default[item];
-                this.setEnabled(item, this.default[item]);
-            }else{
-                this.setEnabled(item, cfg[item]);
-            }
-        });
-        this.bindKeys = keys;
-    }
-    setStroke(element, text){
-        if(element){
-            element.setAttribute('stroke', text);
-        }
-    }
-    setVisibility(element, visible){
-        if(element){
-            element.style.display = visible ? '' : 'none';
-        }
-    }
-    async writeClipboard(content){
-        let clip = navigator.clipboard;
-        if(clip){
-            await clip.writeText(content);
-        }
-    }
-    async readClipboard(){
-        let clip = navigator.clipboard;
-        if(clip){
-            return await clip.readText();
-        }
-        return null;
+        this.configManager.load();
+        this.bindsManager.load();
     }
     // ----- Command -----
     preload(){
@@ -711,7 +306,7 @@ class HornexHack{
     }
     getHP(mob) {
         let tier = mob.tier, type = mob.type;
-        let lst = this.moblst;
+        let lst = this.mobList;
         if(mob.isCentiBody) type--;
         if (!lst[tier] || tier >= lst.length) return;
         for (const i of lst[tier]) {
@@ -719,8 +314,8 @@ class HornexHack{
         }
     }
     onKey(module){
-        if(!this.triggerKeys.includes(module)) this.toggle(module);
-        else this.triggers[module]();
+        if(!this.bindsManager.listTriggers().includes(module)) this.toggle(module);
+        else this.bindsManager.trigger(module);
     }
     getPos(entity=this.player.entity.targetPlayer){
         let x = entity.nx;
@@ -734,15 +329,22 @@ class HornexHack{
         this.addChat('Deleted Build #' + id + ', refresh to view changes');
     }
     viewPetal(id){
-        let builds = this.LS_get('saved_builds');
-        builds['49'] = [id];
-        this.LS_set('saved_builds', JSON.stringify(builds));
-        this.addChat('Set Build #49 to petal ' + id + ', refresh to view changes');
+        let petal = null;
+        this.petalList.forEach(item => {
+            if(item.name == id) petal = item;
+        });
+        if(!petal){
+            this.addChat(`Petal not found: ${id}`, '#ff7f50');
+            return;
+        }
+        let div = document.createElement('div');
+        div.appendChild(hack.showPetal(petal));
+        GUIUtil.createPopupBox(div, 100, 100);
     }
     viewMob(mobName){
         let mobs = $$('.zone-mobs'), id;
         let [name, rarityNum] = this.parseRarity(mobName);
-        this.moblst[rarityNum].forEach(i => {
+        this.mobList[rarityNum].forEach(i => {
             if(i.name.replaceAll(' ', '') == name) id = i;
         });
         if(!id){
@@ -840,13 +442,13 @@ class HornexHack{
     exportBuilds(){
         let builds = this.LS_get('saved_builds');
         let str = btoa(JSON.stringify(builds));
-        this.writeClipboard(str);
+        writeClipboard(str);
         alert('Exported builds to clipboard');
     }
     importBuilds(){
         let str;
         try{
-            // str = JSON.parse(atob(this.readClipboard()));
+            // str = JSON.parse(atob(readClipboard()));
             str = JSON.parse(atob(prompt('Paste your builds here')));
         }catch(e){
             alert('Invalid data: ' + e.message);
@@ -925,12 +527,12 @@ class HornexHack{
             this.setStatus(`${server}: ${status}`);
             let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){
-                this.setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
+                setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
             }
-            if(!this.ingame) this.trackUI.style.display = 'none';
+            setVisibility(this.trackUI, this.ingame && this.isEnabled('showTrackUI'));
             if(this.ingame) this.updatePetal();
             this.clearDots();
-            this.setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childNodes.length);
+            setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childNodes.length);
         }, 1000);
     }
     registerChat(){
@@ -987,9 +589,9 @@ class HornexHack{
                 return;
             }
             if(!this.ingame) return;
-            for(let i = 0; i < Object.keys(this.bindKeys).length; i++){
-                let item = Object.keys(this.bindKeys)[i];
-                if(evt.key == this.bindKeys[item]) this.onKey(item);
+            for(let i = 0; i < this.bindsManager.list().length; i++){
+                let item = this.bindsManager.list()[i];
+                if(evt.key == this.bindsManager.get(item)) this.onKey(item);
             }
         };
         window.addEventListener('keyup', this.listeners['key']);
@@ -1010,7 +612,7 @@ class HornexHack{
     }
     updateMob(mob){
         let tier = mob.tierStr, cur;
-        this.moblst[mob.tier].forEach(i => {
+        this.mobList[mob.tier].forEach(i => {
             if(i.type == mob.type) cur = i;
         });
         if(!cur) return;
@@ -1026,8 +628,9 @@ class HornexHack{
                 dot.classList = ['minimap-dot'];
                 dot.style.left = `${mob.nx / 500 / 60 * 100}%`;
                 dot.style.top = `${mob.ny / 500 / 60 * 100}%`;
+                dot.style.background = '#f00';
                 minimap.appendChild(dot);
-                if(this.trackUI && this.convertID(mob.id) == this.tracking && !mob.isad){
+                if(this.trackUI && this.convertID(mob.id) == this.tracking){
                     let info = `Tracking ID: ${this.tracking}`;
                     info += `<br>Type: ${tier} ${name}`;
                     info += `<br>Health: ${Math.round(mob.health * 100)}%`;
@@ -5325,6 +4928,11 @@ function b(c, d) {
       h2,
     ];
     console[ux(0x8b7)](ux(0xcb1));
+    hack.showPetal = og;
+    hack.petalList = dB;
+    hack.toastFunc = hb;
+    hack.mobFunc = nW;
+    hack.mobList = eN;
     hack.chatFunc = hJ;
     hack.numFunc = iK;
     hack.updatePlayerList = jn;
@@ -5693,10 +5301,21 @@ function b(c, d) {
         window[vu(0x258)](rA, vu(0x501));
       };
     }
-    setInterval(function () {
-      const vv = ux;
-      hX && im(new Uint8Array([cH[vv(0x4af)]]));
-    }, 0x3e8);
+    {
+        const workerScript = `
+            setInterval(function () {
+                postMessage('execute');
+            }, 0x3e8);
+        `;
+        const blob = new Blob([workerScript], { type: 'application/javascript' });
+        const workerURL = URL.createObjectURL(blob);
+        const myWorker = new Worker(workerURL);
+        myWorker.onmessage = function (e) {
+            if (hack.ingame && e.data === 'execute') {
+                im(new Uint8Array([cH.iPing]));
+            }
+        };
+    }
     function hU() {
       const vw = ux;
       (pO = [pV]),
@@ -8117,10 +7736,7 @@ function b(c, d) {
     };
     function kH(rF = ![]) {
       const wY = ux;
-      hack.toastFunc = hb;
       if(rF) hack.onload();
-      hack.mobFunc = nW;
-      hack.moblst = eN;
       if (kl[wY(0x5c6)][wY(0x50f)] === wY(0x5a4)) {
         kD[wY(0x292)][wY(0xae0)](wY(0x695));
         return;
@@ -14501,18 +14117,13 @@ function b(c, d) {
                     else {
                         let inputChat = rN;
                         hack.chatHistory.push(inputChat);
-                        if(inputChat.startsWith('/toggle')){
-                            hack.commandMultiArg('toggle', 2, inputChat);
-                        }else if(inputChat.startsWith('/list')){
+                        if(inputChat.startsWith('/list')){
                             hack.addChat('List of module and configs:');
                             hack.listModule();
                         }else if(inputChat.startsWith('/help')){
                             hack.getHelp();
                         }else if(inputChat.startsWith('/open')){
-                            hack.openGUI();
-                        }else if(inputChat.startsWith('/bind')){
-                            hack.commandMultiArg('bindKey', 3, inputChat);
-                            hack.saveModule();
+                            hack.configManager.openGUI();
                         }else if(inputChat.startsWith('/delBuild')){
                             hack.commandMultiArg('delBuild', 2, inputChat);
                         }else if(inputChat.startsWith('/viewPetal')){
@@ -15281,6 +14892,7 @@ function b(c, d) {
       (oB[AT(0x90b)] = ""), (oC[AT(0x90b)] = "");
       const rV = {},
         rW = [];
+        hack.pushPetals.forEach(petal => rW.push(petal));
       for (let rX in oD) {
         const rY = dB[rX],
           rZ = oD[rX];
