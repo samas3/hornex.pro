@@ -3,15 +3,35 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      font-size: 20px;
-      width: 200px;
+    /* 横向排列*/
+    #message {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    table, th, td {
+        border: 1px solid black;
+        border-collapse: collapse;
+        padding: 5px;
+    }
+    table {
+        margin: 5px;
     }
   </style>
+  <script type="module" src="util.js"></script>
 </head>
 <body>
-  <div id="message"></div>
+  <div id="message">
+    <table>
+        <tr><td>EU1</td><td id="eu1"></td></tr>
+        <tr><td>EU2</td><td id="eu2"></td></tr>
+        <tr><td>US1</td><td id="us1"></td></tr>
+        <tr><td>US2</td><td id="us2"></td></tr>
+        <tr><td>AS1</td><td id="as1"></td></tr>
+        <tr><td>AS2</td><td id="as2"></td></tr>
+        <tr><td>Sandbox</td><td id="sb"></td></tr>
+    </table>
+  </div>
   <script src="popup.js"></script>
 </body>
 </html>

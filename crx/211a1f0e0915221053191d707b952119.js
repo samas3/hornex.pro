@@ -435,8 +435,12 @@ class HornexHack{
         else{
             this.trackingDmg = false;
             let time = Date.now() - this.startTrack;
-            this.addChat(`Total damage: ${this.damageSum} in ${time / 1000} seconds`, '#0ff');
-            this.addChat(`DPS: ${Math.round(this.damageSum / (time / 1000))}`, '#0ff');
+            if(Number.isFinite(this.damageSum)){
+                this.addChat(`Total damage: ${this.damageSum} in ${time / 1000} seconds`, '#0ff');
+                this.addChat(`DPS: ${Math.round(this.damageSum / (time / 1000))}`, '#0ff');
+            }else{
+                this.addChat('No damage detected', '#0ff');
+            }
         }
     }
     exportBuilds(){
@@ -516,6 +520,7 @@ class HornexHack{
         }
     }
     registerMain(){
+        this.prevPos = [0, 0];
         this.intervals['main'] = this.intervals['main'] || setInterval(async () => {
             let status;
             try{
@@ -524,7 +529,8 @@ class HornexHack{
                 if(this.isEnabled('forceLoadScript')) location.reload();
             }
             let server = this.getServer();
-            this.setStatus(`${server}: ${status}`);
+            let dist = Math.round(Math.sqrt((this.player.entity.targetPlayer.nx - this.prevPos[0]) ** 2 + (this.player.entity.targetPlayer.ny - this.prevPos[1]) ** 2));
+            this.setStatus(`${server}: ${status}<br>Speed: ${dist} p/s`);
             let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){
                 setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
@@ -533,6 +539,7 @@ class HornexHack{
             if(this.ingame) this.updatePetal();
             this.clearDots();
             setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childNodes.length);
+            this.prevPos = [this.player.entity.targetPlayer.nx, this.player.entity.targetPlayer.ny];
         }, 1000);
     }
     registerChat(){
@@ -5301,7 +5308,6 @@ function b(c, d) {
         window[vu(0x258)](rA, vu(0x501));
       };
     }
-    {
         const workerScript = `
             setInterval(function () {
                 postMessage('execute');
@@ -5315,7 +5321,6 @@ function b(c, d) {
                 im(new Uint8Array([cH.iPing]));
             }
         };
-    }
     function hU() {
       const vw = ux;
       (pO = [pV]),
