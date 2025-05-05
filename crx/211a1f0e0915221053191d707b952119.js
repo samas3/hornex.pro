@@ -32,7 +32,7 @@ class HornexHack{
             //'/bind <module> <key>': 'bind a module to the specific key',
             //'/bind <module> clear': 'clear a module\'s keybind',
             '/open': 'open the config gui',
-            '/delBuild <id>': 'delete a build',
+            //'/delBuild <id>': 'delete a build',
             '/viewPetal <id>': 'view a petal(add it to a popup box)',
             '/viewMob <id>': 'view a mob(add it to zone mobs)',
             '/track <id/"stop">': 'track a mob',
@@ -117,9 +117,32 @@ class HornexHack{
         // Build Export/Import
         let exportBtn = `<div class="btn" id="exportBuild">Export Build</div>`;
         let importBtn = `<div class="btn" id="importBuild">Import Build</div>`;
-        if(!$('exportBuild')) $$('.builds').childNodes[1].innerHTML += exportBtn + importBtn;
+        $$('.builds').childNodes[1].innerHTML += exportBtn + importBtn;
         $('exportBuild').onclick = () => this.exportBuilds();
         $('importBuild').onclick = () => this.importBuilds();
+    }
+    modifyBuilds(){
+        $$('.clear-build-btn').onclick = () => {
+            if(prompt('Do you want to clear your saved builds?\nNote: it\'s recommended to backup your builds before clearing them.\nType "yes" to confirm.') == "yes"){
+                localStorage.setItem('saved_builds', '[]');
+                alert('Builds cleared');
+            }
+        };
+        $_('.build').forEach((ele, idx) => {
+            let row = ele.querySelector('.build-row');
+            let div = document.createElement('div');
+            div.classList = ['btn'];
+            let span = document.createElement('span');
+            setStroke(span, 'Delete');
+            div.appendChild(span);
+            div.addEventListener('click', () => {
+                let builds = this.LS_get('saved_builds');
+                delete builds[idx];
+                this.LS_set('saved_builds', JSON.stringify(builds));
+                alert(`Deleted build #${idx}, refresh to see changes`)
+            });
+            row.appendChild(div);
+        });
     }
     modifyImport(){
         setStroke($$('body > div.common > div.msg-overlay > div > div.msg-title'), 'Account Manager');
@@ -244,15 +267,23 @@ class HornexHack{
     }
     // ----- Command -----
     preload(){
+        if(this.preloaded) return;
+        this.preloaded = true;
         this.loadStatus();
         this.setStatus('');
         this.loadModule();
         this.table.start();
         this.modifyDOM();
-        let checkDOM = setInterval(() => {
+        let checkImport = setInterval(() => {
             if($$('div[stroke="You will also be logged out of Discord if you are logged in."]')){
-                clearInterval(checkDOM);
+                clearInterval(checkImport);
                 this.modifyImport();
+            }
+        }, 1);
+        let checkBuilds = setInterval(() => {
+            if($$('.clear-build-btn')){
+                clearInterval(checkBuilds);
+                this.modifyBuilds();
             }
         }, 1);
     }
@@ -321,12 +352,6 @@ class HornexHack{
         let x = entity.nx;
         let y = entity.ny;
         return [Math.floor(x / 500), Math.floor(y / 500)];
-    }
-    delBuild(id){
-        let builds = this.LS_get('saved_builds');
-        delete builds[id];
-        this.LS_set('saved_builds', JSON.stringify(builds));
-        this.addChat('Deleted Build #' + id + ', refresh to view changes');
     }
     viewPetal(id){
         let petal = null;
@@ -529,14 +554,16 @@ class HornexHack{
                 if(this.isEnabled('forceLoadScript')) location.reload();
             }
             let server = this.getServer();
-            let dist = Math.round(Math.sqrt((this.player.entity.targetPlayer.nx - this.prevPos[0]) ** 2 + (this.player.entity.targetPlayer.ny - this.prevPos[1]) ** 2));
-            this.setStatus(`${server}: ${status}<br>Speed: ${dist} p/s`);
             let btn = document.getElementsByClassName('btn build-save-btn');
             for(let i = 0; i < btn.length; i++){
                 setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
             }
             setVisibility(this.trackUI, this.ingame && this.isEnabled('showTrackUI'));
-            if(this.ingame) this.updatePetal();
+            if(this.ingame){
+                this.updatePetal();
+                let dist = Math.round(Math.sqrt((this.player.entity.targetPlayer.nx - this.prevPos[0]) ** 2 + (this.player.entity.targetPlayer.ny - this.prevPos[1]) ** 2));
+                this.setStatus(`${server}: ${status}<br>Speed: ${dist} p/s`);
+            }
             this.clearDots();
             setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childNodes.length);
             this.prevPos = [this.player.entity.targetPlayer.nx, this.player.entity.targetPlayer.ny];
@@ -7664,6 +7691,7 @@ function b(c, d) {
         rF = kw();
       for (const rG of rF) {
         const rH = rG[wS(0x476)][0x0];
+        console.log(rH)
         if (!rH) continue;
         rH[wS(0xae0)](),
           iS[wS(0x9db)](rH[wS(0x13d)]),
@@ -14129,8 +14157,6 @@ function b(c, d) {
                             hack.getHelp();
                         }else if(inputChat.startsWith('/open')){
                             hack.configManager.openGUI();
-                        }else if(inputChat.startsWith('/delBuild')){
-                            hack.commandMultiArg('delBuild', 2, inputChat);
                         }else if(inputChat.startsWith('/viewPetal')){
                             hack.commandMultiArg('viewPetal', 2, inputChat);
                         }else if(inputChat.startsWith('/viewMob')){
