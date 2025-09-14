@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hornex.PRO Assistant Script",
-  "version": "2.1",
+  "version": "2.2",
   "description": "Hornex.PRO Assistant Script",
   "permissions": ["activeTab", "scripting", "tabs"],
   "background": {
@@ -20,7 +20,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["211a1f0e0915221053191d707b952119.js", "style.css", "util.js"],
+      "resources": ["f4fab1a431f03484e1a8bebe1372a2f9.js", "style.css", "util.js"],
       "matches": ["https://*/*"]
     }
   ],

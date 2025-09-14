@@ -416,7 +416,8 @@ class ConfigManager{
             showWaveTable: true, // 是否显示wave表格
             extendedZoom: true, // 无限缩放
             showTrackUI: true, // 显示跟踪UI
-            testInteger: 123
+            enableAutoYinYang: false, // 自动按阴阳
+            autoYinYangInterval: 1000 // 自动按阴阳间隔ms
         };
         Object.entries(configs).forEach((key) => {
             this.add(...key);
@@ -456,7 +457,10 @@ class ConfigManager{
         const itemHeight = 48;
         const headerHeight = 54;
         const totalHeight = headerHeight + (this.list().length + this.hack.bindsManager.list().length) * itemHeight;
-        return GUIUtil.createPopupBox(main, 400, totalHeight);
+        let gui = GUIUtil.createPopupBox(main, 400, totalHeight);
+        gui.querySelector('.p-close').addEventListener('click', () => {
+            this.hack.saveModule();
+        });
     }
 }
 class BindsManager{
@@ -473,6 +477,7 @@ class BindsManager{
                 }
             },
             'changeServer': () => this.hack.changeGUI(),
+            'autoYinYang': () => clearInterval(this.hack.intervals['yinyang']),
         };
         this.load();
     }
@@ -496,10 +501,17 @@ class BindsManager{
         localStorage.setItem('hhKeys', JSON.stringify(this.binds));
     }
     load(){
-        if(localStorage.getItem('hhKeys')){
-            this.binds = JSON.parse(localStorage.getItem('hhKeys'));
-        }else{
-            this.loadDefault();
+        let config = localStorage.getItem('hhKeys');
+        this.loadDefault();
+        if(config){
+            config = JSON.parse(config);
+            Object.keys(config).forEach(name => {
+                if(this.get(name)){
+                    this.get(name).set(config[name]);
+                }else{
+                    this.add(name, config[name]);
+                }
+            });
         }
         this.save();
     }

@@ -17,7 +17,7 @@ class HornexHack{
             '#1fdbde',
             '#ff2b75',
             '#2bffa3',
-            '#5c74b0'
+            '#5c74b0'  
         ];
         this.status = '';
         this.name = `Hornex Hack by samas3`;
@@ -131,7 +131,7 @@ class HornexHack{
         $_('.build').forEach((ele, idx) => {
             let row = ele.querySelector('.build-row');
             let div = document.createElement('div');
-            div.classList = ['btn'];
+            div.classList = ['btn delete-btn'];
             let span = document.createElement('span');
             setStroke(span, 'Delete');
             div.appendChild(span);
@@ -215,7 +215,7 @@ class HornexHack{
         let statusBadge = document.createElement('span');
         if(this.bindsManager.get(item)){
             statusBadge.className = 'badge badge-binded';
-            statusBadge.textContent = `Binded to ${this.bindsManager.get(item)}`;
+            statusBadge.textContent = `Binded to ${this.bindsManager.get(item).key}`;
         }else{
             statusBadge.className = 'badge badge-unbinded';
             statusBadge.textContent = 'Not binded';
@@ -240,8 +240,8 @@ class HornexHack{
             if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
                 return;
             }
-            this.bindsManager.set(item, e.key);
-            badgeElement.textContent = `Binded to ${this.bindsManager.get(item)}`;
+            this.bindsManager.set(item, {key: e.key, code: e.code});
+            badgeElement.textContent = `Binded to ${this.bindsManager.get(item).key}`;
             badgeElement.className = 'badge badge-binded';
             document.removeEventListener('keydown', keyHandler);
         };
@@ -276,16 +276,16 @@ class HornexHack{
         this.modifyDOM();
         let checkImport = setInterval(() => {
             if($$('div[stroke="You will also be logged out of Discord if you are logged in."]')){
-                clearInterval(checkImport);
+                //clearInterval(checkImport);
                 this.modifyImport();
             }
         }, 1);
         let checkBuilds = setInterval(() => {
-            if($$('.clear-build-btn')){
-                clearInterval(checkBuilds);
+            if(!$$('.delete-btn')){
+                //clearInterval(checkBuilds);
                 this.modifyBuilds();
             }
-        }, 1);
+        }, 1000);
     }
     onload(){
         this.addChat(`${this.name} enabled!`);
@@ -558,15 +558,19 @@ class HornexHack{
             for(let i = 0; i < btn.length; i++){
                 setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
             }
+            btn = document.getElementsByClassName('btn delete-btn');
+            for(let i = 0; i < btn.length; i++){
+                setVisibility(btn[i], !this.isEnabled('lockBuildChange'));
+            }
             setVisibility(this.trackUI, this.ingame && this.isEnabled('showTrackUI'));
             if(this.ingame){
                 this.updatePetal();
                 let dist = Math.round(Math.sqrt((this.player.entity.targetPlayer.nx - this.prevPos[0]) ** 2 + (this.player.entity.targetPlayer.ny - this.prevPos[1]) ** 2));
-                this.setStatus(`${server}: ${status}<br>Speed: ${dist} p/s`);
+                //this.setStatus(`${server}: ${status}<br>Speed: ${dist} p/s`);
             }
             this.clearDots();
             setVisibility(this.petalDiv, this.isEnabled('showRealTimePickup') && $$('.collected-petals').childNodes.length);
-            this.prevPos = [this.player.entity.targetPlayer.nx, this.player.entity.targetPlayer.ny];
+            if(this.ingame) this.prevPos = [this.player.entity.targetPlayer.nx, this.player.entity.targetPlayer.ny];
         }, 1000);
     }
     registerChat(){
@@ -625,10 +629,23 @@ class HornexHack{
             if(!this.ingame) return;
             for(let i = 0; i < this.bindsManager.list().length; i++){
                 let item = this.bindsManager.list()[i];
-                if(evt.key == this.bindsManager.get(item)) this.onKey(item);
+                if(this.bindsManager.get(item) && evt.key == this.bindsManager.get(item).key) this.onKey(item);
             }
         };
         window.addEventListener('keyup', this.listeners['key']);
+    }
+    registerYinYang(){
+        this.intervals['yinyang'] = setInterval(() => {
+            if(this.isEnabled('enableAutoYinYang')) {
+                let event = new KeyboardEvent('keydown', {
+                    bubbles: true,
+                    cancelable: true,
+                    key: this.bindsManager.get('autoYinYang').key,
+                    code: this.bindsManager.get('autoYinYang').code,
+                });
+                document.dispatchEvent(event);
+            }
+        }, this.configManager.get('autoYinYangInterval').get());
     }
     updatePlayer(player){
         if(player.id == -1){
@@ -818,6 +835,7 @@ class HornexHack{
         this.registerKey();
         this.registerChat();
         this.registerDeath();
+        this.registerYinYang();
     }
 }
 var hack = new HornexHack();
@@ -6360,7 +6378,7 @@ function b(c, d) {
       const w5 = ux,
         rD = j9[rC],
         rE = nR(
-          w5(0xdd4) + j8[rC] + w5(0x743) + rD + w5(0x88e) + rD + w5(0xa03)
+          w5(0xdd4) + hack.getServer() + ' ' + j8[rC] + w5(0x743) + rD + w5(0x88e) + rD + w5(0xa03)
         ),
         rF = rE[w5(0x546)](w5(0x354));
       (j7 = {
@@ -7472,7 +7490,7 @@ function b(c, d) {
             }
             switch (s8) {
               case cS[ws(0xced)]:
-                k9(j7[ws(0x4f7)], ws(0xc7b));
+                k9(j7[ws(0x4f7)], 'Progress ' + Math.round(j7.prog * 10000) / 100 + "%");
                 break;
               case cS[ws(0x2f8)]:
                 const u1 = rN[ws(0x66e)](rO++) + 0x1;
@@ -14214,7 +14232,7 @@ function b(c, d) {
     function nw(rM) {
       return function (rN) {
         const Ac = b;
-        rN instanceof Event && rN[Ac(0x218)] && !rN[Ac(0xa08)] && rM(rN);
+        rN instanceof Event && (1||rN[Ac(0x218)]) && !rN[Ac(0xa08)] && rM(rN);
       };
     }
     var nx = [];
